@@ -1,0 +1,22 @@
+{
+  "name": "gitops-cli",
+  "version": "1.0.0",
+  "description": "GitOps tooling for CLI and CI",
+  "main": "bin.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mxcd/gitops.git"
+  },
+  "author": "maxpartenfelder@gmail.com",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mxcd/gitops/issues"
+  },
+  "homepage": "https://github.com/mxcd/gitops#readme",
+  "dependencies": {
+    "gitlab-x": "^0.2.9"
+  }
+}
