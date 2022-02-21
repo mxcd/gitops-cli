@@ -16,11 +16,12 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v2
 
-    - name: Test & Publish
+    - name: Setup node 16.x
       uses: actions/setup-node@v2
       with:
         node-version: 16.x
         cache: 'npm'
+    - name: Test & Publish
       run: |
         npm install
         npm test
