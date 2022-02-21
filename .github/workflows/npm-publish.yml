@@ -13,7 +13,9 @@ jobs:
     runs-on: ubuntu-latest
         
     steps:
+    - name: Checkout
     - uses: actions/checkout@v2
+    
     - name: Test & Publish
       uses: actions/setup-node@v2
       with:
@@ -25,6 +27,7 @@ jobs:
         npm version ${{ github.event.release.tag_name }}
         npm config set //registry.npmjs.org/:_authToken ${NPM_TOKEN}
         npm publish
+
     - name: Push new version
     - uses: stefanzweifel/git-auto-commit-action@v4
       with:
