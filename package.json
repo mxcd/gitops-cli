@@ -7,6 +7,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 0"
   },
+  "bin": {
+    "gitops-cli": "./bin.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mxcd/gitops.git"
