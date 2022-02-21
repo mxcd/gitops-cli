@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "GitOps tooling for CLI and CI",
   "main": "bin.js",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 0"
   },
@@ -17,6 +18,8 @@
   },
   "homepage": "https://github.com/mxcd/gitops#readme",
   "dependencies": {
-    "gitlab-x": "^0.2.9"
+    "argparse": "^2.0.1",
+    "gitlab-x": "^0.2.9",
+    "js-yaml": "^4.1.0"
   }
 }
