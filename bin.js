@@ -26,7 +26,7 @@ const ENVIRONMENT_VARIABLES = [
   {name: 'GITOPS_BASE_URL', default: 'https://github.com', varialbe: 'url', required: true},
   {name: 'GITOPS_AT', default: null, varialbe: 'access_token', required: true},
   {name: 'GITOPS_REPO', default: null, varialbe: 'repo', required: true},
-  {name: 'GITOPS_BRANCH', varialbe: 'branch'},
+  {name: 'GITOPS_BRANCH', varialbe: 'branch', default: 'master'},
   {name: 'GITOPS_APPLICATIONS_DIR', default: 'applications', varialbe: 'applications_dir', required: true},
   {name: 'GITOPS_VALUES_FILE', default: 'values.yaml', varialbe: 'values_file', required: true},
 ]
@@ -39,16 +39,22 @@ parser.add_argument('action', {metavar: 'action', type: String, nargs: '?', help
 parser.add_argument('parameters', {metavar: 'parameters', type: String, nargs: '*', help: 'action parameters to be used'});
 parser.add_argument('-v', '--version', { action: 'version', version });
 parser.add_argument('-t', '--access-token', {type: String, help: 'access token with API permissions'});
-parser.add_argument('-u', '--url', {type: String, default: 'https://github.com', help: 'git system base url (e.g. https://github.com)'})
+parser.add_argument('-u', '--url', {type: String, help: 'git system base url (e.g. https://github.com)'})
 parser.add_argument('--verbose', {action: 'store_true', help: 'increased console output'})
-parser.add_argument('--branch', {metavar: 'branch', type: String, default: 'master', help: 'gitops branch to use'})
+parser.add_argument('--branch', {metavar: 'branch', type: String, help: 'gitops branch to use'})
 parser.add_argument('--repo', {metavar: 'repo', type: String, help: 'gitops repo to use'})
-parser.add_argument('--applications-dir', {type: String, default: 'applications', help: 'applications directory in gitops repo'})
-parser.add_argument('--values-file', {type: String, default: 'values.yaml', help: 'values file to patch'})
+parser.add_argument('--applications-dir', {type: String, help: 'applications directory in gitops repo'})
+parser.add_argument('--values-file', {type: String, help: 'values file to patch'})
 
 const args = parser.parse_args()
 
 for(const variable of ENVIRONMENT_VARIABLES) {
+  if(!process.env[variable.name]) {
+    if(variable.default) {
+      process.env[variable.name] = variable.default;
+    }
+  }
+  
   if(process.env[variable.name] && !args[variable.varialbe]) {
     args[variable.varialbe] = process.env[variable.name]
   }

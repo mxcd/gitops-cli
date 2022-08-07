@@ -1,5 +1,12 @@
-import {apiTest, getApiDriver} from 'gitlab-x';
-import { load as loadYml, dump as dumpYml } from 'js-yaml';
+import {
+  apiTest as gitlabApiTest,
+  getApiDriver as getGitlabApiDriver,
+} from "gitlab-x";
+import {
+  apiTest as githubApiTest,
+  getApiDriver as getGithubApiDriver,
+} from "github-x";
+import { load as loadYml, dump as dumpYml } from "js-yaml";
 
 /* 
 gitops patch function
@@ -19,105 +26,140 @@ required options:
 export async function patch(options) {
   const verbose = options.verbose;
 
-  if(verbose) console.log(`patch options: ${JSON.stringify(options, null, 2)}`);
+  if (verbose)
+    console.log(`patch options: ${JSON.stringify(options, null, 2)}`);
 
-  if(!(options.values_file.endsWith('.yml') || options.values_file.endsWith('.yaml'))) {
+  if (
+    !(
+      options.values_file.endsWith(".yml") ||
+      options.values_file.endsWith(".yaml")
+    )
+  ) {
     throw new Error(`values_file must be a *.yml or *.yaml file`);
   }
 
   let gitProvider = await getGitProvider(options);
-  if(verbose) console.log(`Git Provider: ${gitProvider}`);
+  if (verbose) console.log(`Git Provider: ${gitProvider}`);
   let apiDriver;
-  if(gitProvider === 'gitlab') {
-    apiDriver = getApiDriver(options);
+  if (gitProvider === "gitlab") {
+    apiDriver = getGitlabApiDriver(options);
+  } else if (gitProvider === "github") {
+    apiDriver = getGithubApiDriver(options);
+  } else {
+    throw new Error(`Unsupported git provider: ${gitProvider}`);
   }
 
-  if(!await apiDriver.getVersion()) {
+  if (!(await apiDriver.getVersion())) {
     throw new Error(`API check failed`);
   }
 
   const projectIdentifier = `/${stripSlashes(options.repo)}`;
-  
-  let filePath = `/${stripSlashes(options.applications_dir)}/${stripSlashes(options.application)}/${stripSlashes(options.values_file)}`;
-  if(verbose) console.log(`file path: ${filePath}`);
-  const fileExists = await apiDriver.fileExists(projectIdentifier, filePath, options.branch);
 
-  if(!fileExists) {
-    if(verbose) console.log(`file '${filePath}' does not exist in branch '${options.branch}'`);
-    filePath = `/${stripSlashes(options.applications_dir)}/${stripSlashes(options.application)}/${stripSlashes(toggleYamlFileExtension(options.values_file))}`;
-    if(verbose) console.log(`trying opposite yaml file extension '${filePath}'`);
-    const toggledYamlFileExists = await apiDriver.fileExists(projectIdentifier, filePath, options.branch);
-    if(!toggledYamlFileExists) {
+  let filePath = `/${stripSlashes(options.applications_dir)}/${stripSlashes(
+    options.application
+  )}/${stripSlashes(options.values_file)}`;
+  if (verbose) console.log(`file path: ${filePath}`);
+  const fileExists = await apiDriver.fileExists(
+    projectIdentifier,
+    filePath,
+    options.branch
+  );
+
+  if (!fileExists) {
+    if (verbose)
+      console.log(
+        `file '${filePath}' does not exist in branch '${options.branch}'`
+      );
+    filePath = `/${stripSlashes(options.applications_dir)}/${stripSlashes(
+      options.application
+    )}/${stripSlashes(toggleYamlFileExtension(options.values_file))}`;
+    if (verbose)
+      console.log(`trying opposite yaml file extension '${filePath}'`);
+    const toggledYamlFileExists = await apiDriver.fileExists(
+      projectIdentifier,
+      filePath,
+      options.branch
+    );
+    if (!toggledYamlFileExists) {
       throw new Error(`file '${filePath}' does not exist`);
     }
   }
-  
-  if(verbose) console.log(`file '${filePath}' exists`);
-  
-  const fileContent = await apiDriver.getRawFile(projectIdentifier, filePath, options.branch);
-  if(verbose) console.log(`file contents: \n\n----\n${fileContent}\n----\n\n`);
-  
+
+  if (verbose) console.log(`file '${filePath}' exists`);
+
+  const fileContent = await apiDriver.getRawFile(
+    projectIdentifier,
+    filePath,
+    options.branch
+  );
+  if (verbose) console.log(`file contents: \n\n----\n${fileContent}\n----\n\n`);
+
   const yml = loadYml(fileContent);
   let patchFields = [];
-  if(options.patch_field.startsWith('.')) {
-    if(verbose) console.log(`patch field is assumed to be a yaml path`);
+  if (options.patch_field.startsWith(".")) {
+    if (verbose) console.log(`patch field is assumed to be a yaml path`);
     patchFields = [options.patch_field];
-  }
-  else {
-    if(verbose) console.log(`patch field is assumed to be a field name`);
+  } else {
+    if (verbose) console.log(`patch field is assumed to be a field name`);
     patchFields = findYmlField(yml, options.patch_field);
-    if(verbose) console.log(`found patch fields: ${patchFields}`);
+    if (verbose) console.log(`found patch fields: ${patchFields}`);
   }
 
   let changes = false;
-  for(const patchField of patchFields) {
-    if(!existsYmlField(yml, patchField)) {
-      throw new Error(`field '${patchField}' does not exist in file '${filePath}'`);
+  for (const patchField of patchFields) {
+    if (!existsYmlField(yml, patchField)) {
+      throw new Error(
+        `field '${patchField}' does not exist in file '${filePath}'`
+      );
     }
-    
-    if(verbose) console.log(`patching field '${patchField}'`);
+
+    if (verbose) console.log(`patching field '${patchField}'`);
     const patchValue = getYmlFieldValue(yml, patchField);
-    if(verbose) console.log(`old value: ${patchValue}`);
+    if (verbose) console.log(`old value: ${patchValue}`);
     const newValue = options.patch_value;
-    if(verbose) console.log(`new value: ${newValue}`);
-    if(patchValue !== newValue) {
+    if (verbose) console.log(`new value: ${newValue}`);
+    if (patchValue !== newValue) {
       changes = true;
       setYmlFieldValue(yml, patchField, newValue);
     }
   }
 
-  if(!changes) {
+  if (!changes) {
     console.log(`no changes to commit`);
     return;
   }
 
   const ymlDump = dumpYml(yml);
 
-  if(verbose) console.log(`new file contents: \n\n----\n${ymlDump}\n----\n\n`);
+  if (verbose) console.log(`new file contents: \n\n----\n${ymlDump}\n----\n\n`);
 
-  if(verbose) console.log('creating commit')
+  if (verbose) console.log("creating commit");
   let targetBranch = options.branch;
-  if (typeof ref === 'undefined') {
+  if (typeof ref === "undefined") {
     // TODO add to defaultBranch function to gitlab-x
-    const defaultBranch = (await apiDriver.getProject(projectIdentifier)).default_branch;
-    if (verbose) console.log(`'ref' is not specified. Using default branch '${defaultBranch}'`);
+    const defaultBranch = (await apiDriver.getProject(projectIdentifier))
+      .default_branch;
+    if (verbose)
+      console.log(
+        `'ref' is not specified. Using default branch '${defaultBranch}'`
+      );
     targetBranch = defaultBranch;
   }
   let commitObject = {
-    "branch": targetBranch,
+    branch: targetBranch,
     // TODO add original author to commit message
-    "commit_message": options.message || `Patched '${filePath}'`,
-    "actions": [
+    commit_message: options.message || `Patched '${filePath}'`,
+    actions: [
       {
-        "action": "update",
-        "file_path": filePath,
-        "content": ymlDump,
-        "encoding": "text"
-      }
-    ]
+        action: "update",
+        file_path: filePath,
+        content: ymlDump,
+        encoding: "text",
+      },
+    ],
   };
   await apiDriver.postCommit(projectIdentifier, commitObject);
-  if(verbose) console.log('commit done');
+  if (verbose) console.log("commit done");
   return;
 }
 
@@ -131,52 +173,66 @@ returns
   - 'gitlab' if the base url points to a gitlab url with activated api
 */
 async function getGitProvider(options) {
-  if(options.verbose) console.log("checking for gitlab api")
-  const gitlabApiResult = await apiTest(options);
-  if(gitlabApiResult) {
-    if(options.verbose) console.log("found gitlab api");
-    return 'gitlab';
+  if (options.verbose) console.log("checking for gitlab api");
+  try {
+    const gitlabApiResult = await gitlabApiTest(options);
+    if (gitlabApiResult) {
+      if (options.verbose) console.log("found gitlab api");
+      return "gitlab";
+    }
+  } catch (e) {
+    // error is expected if the gitlab api is not present
   }
-  
-  if(options.verbose) console.log("checking for github api");
-  throw new Error("GitHub API not implemented yet");
-  // TODO
+
+  try {
+    if (options.verbose) console.log("checking for github api");
+    const githubApiResult = await githubApiTest(options);
+    if (githubApiResult) {
+      if (options.verbose) console.log("found github api");
+      return "github";
+    }
+  } catch (e) {
+    // error is expected if the github api is not present
+  }
+  return "";
 }
 
 // strips tailing and leading slashes from a string
 function stripSlashes(str) {
-  return str.replace(/^\/|\/$/g, '');
+  return str.replace(/^\/|\/$/g, "");
 }
 
 function toggleYamlFileExtension(fileName) {
-  if(fileName.endsWith('.yml')) {
-    return fileName.replace('.yml', '.yaml');
-  } else if(fileName.endsWith('.yaml')) {
-    return fileName.replace('.yaml', '.yml');
+  if (fileName.endsWith(".yml")) {
+    return fileName.replace(".yml", ".yaml");
+  } else if (fileName.endsWith(".yaml")) {
+    return fileName.replace(".yaml", ".yml");
   } else {
     return fileName;
   }
 }
 
-function findYmlField(yml, fieldName, subPath = '') {
+function findYmlField(yml, fieldName, subPath = "") {
   let occurences = [];
-  for(let key in yml) {
-    if(key === fieldName) {
+  for (let key in yml) {
+    if (key === fieldName) {
       occurences.push(`${subPath}.${key}`);
-    } else if(typeof yml[key] === 'object') {
-      occurences = occurences.concat(findYmlField(yml[key], fieldName, `${subPath}.${key}`));
+    } else if (typeof yml[key] === "object") {
+      occurences = occurences.concat(
+        findYmlField(yml[key], fieldName, `${subPath}.${key}`)
+      );
     }
   }
   return occurences;
 }
 
 function existsYmlField(yml, fieldPath) {
-  const fieldPathParts = fieldPath.split('.');
+  const fieldPathParts = fieldPath.split(".");
   let currentYml = yml;
-  for(let i = 0; i < fieldPathParts.length; i++) {
+  for (let i = 0; i < fieldPathParts.length; i++) {
     const fieldPathPart = fieldPathParts[i];
-    if(fieldPathPart === '') continue;
-    if(!currentYml[fieldPathPart]) {
+    if (fieldPathPart === "") continue;
+    if (!currentYml[fieldPathPart]) {
       return false;
     }
     currentYml = currentYml[fieldPathPart];
@@ -185,26 +241,26 @@ function existsYmlField(yml, fieldPath) {
 }
 
 function getYmlFieldValue(yml, fieldPath) {
-  const fieldPathParts = fieldPath.split('.');
+  const fieldPathParts = fieldPath.split(".");
   let currentYml = yml;
-  for(let i = 0; i < fieldPathParts.length; i++) {
+  for (let i = 0; i < fieldPathParts.length; i++) {
     const fieldPathPart = fieldPathParts[i];
-    if(fieldPathPart === '') continue;
+    if (fieldPathPart === "") continue;
     currentYml = currentYml[fieldPathPart];
   }
   return currentYml;
 }
 
 function setYmlFieldValue(yml, fieldPath, value) {
-  const fieldPathParts = fieldPath.split('.');
+  const fieldPathParts = fieldPath.split(".");
   let currentYml = yml;
-  for(let i = 0; i < fieldPathParts.length; i++) {
+  for (let i = 0; i < fieldPathParts.length; i++) {
     const fieldPathPart = fieldPathParts[i];
-    if(fieldPathPart === '') continue;
-    if(i === fieldPathParts.length - 1) {
+    if (fieldPathPart === "") continue;
+    if (i === fieldPathParts.length - 1) {
       currentYml[fieldPathPart] = value;
     } else {
-      if(!currentYml[fieldPathPart]) {
+      if (!currentYml[fieldPathPart]) {
         currentYml[fieldPathPart] = {};
       }
       currentYml = currentYml[fieldPathPart];
