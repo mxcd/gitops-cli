@@ -16,6 +16,7 @@ required options:
   - access_token: access token with API permissions
   - repo: git repository to use
   - branch: branch to use in git repository. defaults to repo's default branch if not given
+  - behalf: user to act on behalf of
   - applications_dir: directory where the applications are stored
   - values_file: file containing the value to patch
   - application: name of the application to patch
@@ -145,10 +146,18 @@ export async function patch(options) {
       );
     targetBranch = defaultBranch;
   }
+
+  let commitMessage = `Patched '${filePath}'`;
+  if(options.behalf) {
+    commitMessage = `[${options.behalf}] ${commitMessage}`;
+  }
+  if(options.message) {
+    commitMessage = options.message;
+  }
+
   let commitObject = {
     branch: targetBranch,
-    // TODO add original author to commit message
-    commit_message: options.message || `Patched '${filePath}'`,
+    commit_message: commitMessage,
     actions: [
       {
         action: "update",

@@ -40,6 +40,7 @@ parser.add_argument('parameters', {metavar: 'parameters', type: String, nargs: '
 parser.add_argument('-v', '--version', { action: 'version', version });
 parser.add_argument('-t', '--access-token', {type: String, help: 'access token with API permissions'});
 parser.add_argument('-u', '--url', {type: String, help: 'git system base url (e.g. https://github.com)'})
+parser.add_argument('-b', '--behalf', {type: String, help: 'user on whose behalf to execute the action'})
 parser.add_argument('--verbose', {action: 'store_true', help: 'increased console output'})
 parser.add_argument('--branch', {metavar: 'branch', type: String, help: 'gitops branch to use'})
 parser.add_argument('--repo', {metavar: 'repo', type: String, help: 'gitops repo to use'})
