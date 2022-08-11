@@ -29,7 +29,7 @@ jobs:
     - name: Test & Publish
       run: |
         npm install
-        npm version ${{ github.event.release.tag_name }} --no-git-tag-version
+        npm version ${{ github.event.release.tag_name }} --no-git-tag-version || true
         npm config set //registry.npmjs.org/:_authToken ${{ secrets.NPM_TOKEN }}
         npm publish
 
