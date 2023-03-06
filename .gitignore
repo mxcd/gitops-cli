@@ -2,8 +2,12 @@
 *.secret.yml
 *.secret.env
 
-gitops
+# Ignore "main" binary
 main
+# Ignore "gitops" binary
+gitops
+# Actually... dont ignore gitops directory
+!cmd/gitops/
 
 # Created by https://www.toptal.com/developers/gitignore/api/go,visualstudiocode,goland+all
 # Edit at https://www.toptal.com/developers/gitignore?templates=go,visualstudiocode,goland+all

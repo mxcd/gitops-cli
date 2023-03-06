@@ -82,3 +82,17 @@ name: my/secret/name
 # will be applied as
 name: my-secret-name
 ```
+
+
+## Repository
+
+### After the first clone
+
+#### Pre-commit
+
+Please make sure to follow [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) when committing to this repository.  
+To make one's life easier, a pre-commit config is provided that can be installed with the following command:
+
+```bash
+pre-commit install --hook-type commit-msg
+```
