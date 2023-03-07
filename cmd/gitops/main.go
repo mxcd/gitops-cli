@@ -14,6 +14,14 @@ func main() {
 	app := &cli.App{
 		Name:  "gitpos",
 		Usage: "GitOps CLI",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "root-dir",
+				Value: "",
+				Usage: "root directory of the git repository",
+				EnvVars: []string{"GITOPS_ROOT_DIR"},
+			},
+		},
 		Commands: []*cli.Command{
 			{
 				Name: "bar",
@@ -52,10 +60,7 @@ func main() {
 						Name: "test",
 						Usage: "Test the templating of secrets",
 						Action: func(c *cli.Context) error {
-							rootDir, err := util.GetGitRepoRoot()
-							if err != nil {
-								log.Fatal(err)
-							}
+							rootDir := getRootDir(c)
 							secretFiles, err := util.GetSecretFiles(rootDir)
 							if err != nil {
 								log.Fatal(err)

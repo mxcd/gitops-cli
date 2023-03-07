@@ -8,12 +8,14 @@ RUN go mod download
 
 COPY . .
 ENV SOPS_AGE_KEY_FILE=/usr/src/test/keys.txt
+ENV GITOPS_ROOT_DIR=/usr/src
 RUN go test ./...
 
-RUN go build -o gitops -ldflags="-s -w" cmd/gitops/main.go
+WORKDIR /usr/src/cmd/gitops
+RUN go build -o gitops -ldflags="-s -w" .
 
 FROM alpine:3.17
 WORKDIR /usr/bin
-COPY --from=builder /usr/src/gitops .
+COPY --from=builder /usr/src/cmd/gitops/gitops .
 ENTRYPOINT ["/usr/bin/gitops"]
 CMD ["--help"]
