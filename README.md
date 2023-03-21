@@ -71,7 +71,6 @@ data:
 ```
 
 To ensure intercompatibility with K8s and vault, the following rules apply:
-
 If the name is not given in the file, the name will be inferred from the filename. The file extension `.secret.enc.y[a]ml` will be removed.
 
 ```yaml
