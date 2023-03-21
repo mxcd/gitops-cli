@@ -42,13 +42,30 @@ Make sure to follow a strict naming convention for your secret files, in order t
 
 The secrets files must follow the following format:
 
+Case 1: Secret for Vault
+
 ```yaml
+# target of the secret
+target: vault
+# name of the secret - will be used as path in vault
+name: /my/secret/name
+# data of the secret as kv pairs
+data:
+  key: value
+```
+
+Case 2: Secret for K8s
+
+```yaml
+# target of the secret
+target: k8s
 # name of the secret
-name: secret-name
-# namespace of the secret (only applicable for K8s)
-namespace: secret-namespace
-# data of the secret
-# only KV pairs are supported
+name: my-secret-name
+# optional namespace of the secret (default: default)
+namespace: my-namespace
+# type of the secret (default: Opaque)
+type: Opaque
+# data of the secret as kv pairs
 data:
   key: value
 ```
@@ -60,12 +77,15 @@ If the name is not given in the file, the name will be inferred from the filenam
 ```yaml
 my-secret-name.secret.enc.yaml
 # will be applied as
-# K8s:
 name: my-secret-name
-# Vault path:
-/my/secret/name
 ```
 
+This implies, that the filename must be a valid K8s secret name.  
+Vault names from file are yet to be defined.
+
+**DRAFT:**  
+Question: how to handle dashes in the file name?
+What if the vault path SHOULD contain dashes?
 When applying to vault, dashes in the file name will be converted to slashes:
 
 ```yaml
@@ -74,15 +94,6 @@ my-secret-name.secret.enc.yaml
 # Vault path:
 /my/secret/name
 ```
-
-When applying to K8s, slashes in the name will be converted to dashes:
-
-```yaml
-name: my/secret/name
-# will be applied as
-name: my-secret-name
-```
-
 
 ## Repository
 

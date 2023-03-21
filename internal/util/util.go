@@ -60,11 +60,21 @@ func GetGitRepoRoot() (string, error) {
 	return strings.TrimSpace(string(path)), nil
 }
 
-func DecryptFile(path string) (string, error) {
+func DecryptFile(path string) ([]byte, error) {
 	log.Trace("Decrypting file: ", path)
 	decrypted, err := decrypt.File(path, "yaml")
 	if err != nil {
-		return "", err
+		return []byte{}, err
 	}
-	return string(decrypted), nil
+	return decrypted, nil
+}
+
+
+var secretFilenameRegex = regexp.MustCompile(`\.secret\.enc\.ya?ml$`)
+
+/* 
+Removes the path and the `secret.enc.ya?ml` suffix from a given path
+*/
+func GetSecretBasename(path string) string {
+	return secretFilenameRegex.ReplaceAllString(filepath.Base(path), "")
 }

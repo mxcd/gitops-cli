@@ -3,6 +3,8 @@ package util
 import (
 	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetSecretFiles(t *testing.T) {
@@ -34,4 +36,15 @@ func TestDecryptFile(t *testing.T) {
 		t.Error(err)
 	}
 	t.Log(decryptedFile)
+}
+
+func TestGetBasenameWithoutExtension(t *testing.T) {
+	basename := GetSecretBasename("/foo/bar/baz.secret.enc.yml")
+	assert.Equal(t, "baz", basename, "Basename should be baz")
+
+	basename = GetSecretBasename("/foo/bar/baz.secret.enc.yaml")
+	assert.Equal(t, "baz", basename, "Basename should be baz")
+
+	basename = GetSecretBasename("baz.secret.enc.yml")
+	assert.Equal(t, "baz", basename, "Basename should be baz")
 }
