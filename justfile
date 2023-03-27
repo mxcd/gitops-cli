@@ -8,5 +8,5 @@ default:
 push +COMMIT_MESSAGE:
   git add .
   git commit -m "{{COMMIT_MESSAGE}}"
-  git pull origin main
-  git push origin main
+  git pull origin $(git rev-parse --abbrev-ref HEAD)
+  git push origin $(git rev-parse --abbrev-ref HEAD)
