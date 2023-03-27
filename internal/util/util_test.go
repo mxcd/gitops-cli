@@ -1,7 +1,7 @@
 package util
 
 import (
-	"fmt"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -31,7 +31,7 @@ func TestGetGitRepoRoot(t *testing.T) {
 
 func TestDecryptFile(t *testing.T) {
 	rootDir, _ := GetGitRepoRoot()
-	decryptedFile, err := DecryptFile(fmt.Sprintf("%s%s", rootDir, "/test/test.secret.enc.yml"))
+	decryptedFile, err := DecryptFile(filepath.Join(rootDir, "test_assets", "test.gitops.secret.enc.yml"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -39,12 +39,12 @@ func TestDecryptFile(t *testing.T) {
 }
 
 func TestGetBasenameWithoutExtension(t *testing.T) {
-	basename := GetSecretBasename("/foo/bar/baz.secret.enc.yml")
+	basename := GetSecretBasename("/foo/bar/baz.gitops.secret.enc.yml")
 	assert.Equal(t, "baz", basename, "Basename should be baz")
 
-	basename = GetSecretBasename("/foo/bar/baz.secret.enc.yaml")
+	basename = GetSecretBasename("/foo/bar/baz.gitops.secret.enc.yaml")
 	assert.Equal(t, "baz", basename, "Basename should be baz")
 
-	basename = GetSecretBasename("baz.secret.enc.yml")
+	basename = GetSecretBasename("baz.gitops.secret.enc.yml")
 	assert.Equal(t, "baz", basename, "Basename should be baz")
 }

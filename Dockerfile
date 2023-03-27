@@ -6,7 +6,8 @@ COPY go.mod /usr/src/go.mod
 COPY go.sum /usr/src/go.sum
 RUN go mod download
 
-COPY . .
+COPY cmd cmd
+COPY internal internal
 
 WORKDIR /usr/src/cmd/gitops
 RUN go build -o gitops -ldflags="-s -w" .

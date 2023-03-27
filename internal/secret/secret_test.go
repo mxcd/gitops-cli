@@ -1,13 +1,14 @@
 package secret
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestLoadSecret1(t *testing.T) {
-	f := "../../test/test.secret.enc.yml"
+	f := filepath.Join("..", "..", "test_assets", "test.gitops.secret.enc.yml")
 	secret := Secret {
 		Path: f,
 	}
@@ -26,7 +27,7 @@ func TestLoadSecret1(t *testing.T) {
 }
 
 func TestLoadSecret2(t *testing.T) {
-	f := "../../test/implicit-name.secret.enc.yml"
+	f := filepath.Join("..", "..", "test_assets", "implicit-name.gitops.secret.enc.yml")
 	secret := Secret {
 		Path: f,
 	}

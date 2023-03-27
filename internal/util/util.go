@@ -17,32 +17,33 @@ import (
 func GetSecretFiles(rootDirectory string) ([]string, error) {
 	log.Trace("Searching for secret files in given directory")
 
-	secretFileRegex, err := regexp.Compile(`.*\.secret\.enc\.ya?ml$`)
+	secretFileRegex, err := regexp.Compile(`.*\.gitops\.secret\.enc\.ya?ml$`)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	var secretFiles []string
 	err = filepath.WalkDir(rootDirectory,
-	func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			log.Trace("Skipping directory: ", path)
-			return nil;
-		}
-		if strings.Contains(path, ".git") {
-			log.Trace("Skipping git directory: ", path)
-			return nil;
-		}
+		func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if strings.Contains(path, ".git") && !strings.Contains(path, ".gitops") {
+				log.Trace("Skipping git directory: ", path)
+				return nil;
+			}
 
-		if secretFileRegex.MatchString(path) {
-			log.Debug("Found secret file: ", path)
-			secretFiles = append(secretFiles, path)
-		}
-		return nil
-	})
+			if d.IsDir() {
+				log.Trace("Skipping directory: ", path)
+				return nil;
+			}
+
+			if secretFileRegex.MatchString(path) {
+				log.Debug("Found secret file: ", path)
+				secretFiles = append(secretFiles, path)
+			}
+			return nil
+		})
 	if err != nil {
 		log.Error("An error occurred while searching for secret files")
 		log.Error(err)
@@ -70,10 +71,10 @@ func DecryptFile(path string) ([]byte, error) {
 }
 
 
-var secretFilenameRegex = regexp.MustCompile(`\.secret\.enc\.ya?ml$`)
+var secretFilenameRegex = regexp.MustCompile(`\.gitops\.secret\.enc\.ya?ml$`)
 
 /* 
-Removes the path and the `secret.enc.ya?ml` suffix from a given path
+Removes the path and the `gitops.secret.enc.ya?ml` suffix from a given path
 */
 func GetSecretBasename(path string) string {
 	return secretFilenameRegex.ReplaceAllString(filepath.Base(path), "")

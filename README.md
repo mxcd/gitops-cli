@@ -24,7 +24,7 @@ the secrets are stored in a Git repository and secured using SOPS.
 #### Secret storage
 
 Secrets are stored in any directory of your git repository. The GitOps CLI will pick
-up any file that ends with `*.secret.enc.yml` or `*.secret.enc.yaml`. The secret files
+up any file that ends with `*.gitops.secret.enc.yml` or `*.gitops.secret.enc.yaml`. The secret files
 must be encrypted using SOPS.
 
 **NOTE:** Secrets MUST NEVER be committed into version control unencrypted.
@@ -71,28 +71,15 @@ data:
 ```
 
 To ensure intercompatibility with K8s and vault, the following rules apply:
-If the name is not given in the file, the name will be inferred from the filename. The file extension `.secret.enc.y[a]ml` will be removed.
+If the name is not given in the file, the name will be inferred from the filename. The file extension `.gitops.secret.enc.y[a]ml` will be removed.
 
 ```yaml
-my-secret-name.secret.enc.yaml
+my-secret-name.gitops.secret.enc.yaml
 # will be applied as
 name: my-secret-name
 ```
 
 This implies, that the filename must be a valid K8s secret name.  
-Vault names from file are yet to be defined.
-
-**DRAFT:**  
-Question: how to handle dashes in the file name?
-What if the vault path SHOULD contain dashes?
-When applying to vault, dashes in the file name will be converted to slashes:
-
-```yaml
-# filename:
-my-secret-name.secret.enc.yaml
-# Vault path:
-/my/secret/name
-```
 
 ## Repository
 

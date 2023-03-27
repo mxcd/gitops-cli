@@ -1,0 +1,40 @@
+name: Build
+
+on:
+  push:
+    tags:
+      - "2.*"
+
+jobs:
+  test:
+    name: Build
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+        include:
+          - os: ubuntu-latest
+            os_name: ubuntu
+            artifact_suffix: ""
+          - os: ubuntu-18.04
+            os_name: ubuntu-18.04
+            artifact_suffix: ""
+          - os: windows-latest
+            os_name: windows
+            artifact_suffix: ".exe"
+          - os: macos-11
+            os_name: macos
+            artifact_suffix: ""
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions/setup-go@v4
+      - name: golang build
+        run: |
+          GOARCH=${{ matrix.arch }} go build -ldflags="-s -w" .
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: target/release/gitops${{ matrix.artifact_suffix }}
+          asset_name: gitops_${{ matrix.os_name }}_${{ matrix.arch }}${{ matrix.artifact_suffix }}
+          tag: ${{ github.ref }}
