@@ -40,6 +40,6 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: cmd/gitpos/gitops${{ matrix.artifact_suffix }}
+          file: ${{ github.workspace }}/cmd/gitops/gitops${{ matrix.artifact_suffix }}
           asset_name: gitops_${{ matrix.os_name }}_${{ matrix.arch }}${{ matrix.artifact_suffix }}
           tag: ${{ github.ref }}
