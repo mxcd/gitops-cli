@@ -16,6 +16,8 @@ jobs:
     steps:
       - uses: actions/checkout@master
       - uses: actions/setup-go@v4
+        with:
+          go-version: 1.19
       - name: run golang tests
         run: |
           export SOPS_AGE_KEY_FILE=${PWD}/test_assets/keys.txt
