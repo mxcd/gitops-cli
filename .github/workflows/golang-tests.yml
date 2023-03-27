@@ -13,7 +13,8 @@ jobs:
     steps:
       - uses: actions/checkout@master
       - uses: actions/setup-go@v4
-      - run: |
+      - name: run golang tests
+        run: |
           export SOPS_AGE_KEY_FILE=${PWD}/test/keys.txt
           export GITOPS_ROOT_DIR=${PWD}
           go test ./...
