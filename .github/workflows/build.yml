@@ -11,6 +11,7 @@ jobs:
     strategy:
       matrix:
         arch: [amd64, arm64]
+        os: [ubuntu-latest, ubuntu-18.04, windows-latest, macos-11]
         include:
           - os: ubuntu-latest
             os_name: ubuntu
