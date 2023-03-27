@@ -9,6 +9,7 @@ jobs:
   test:
     name: Build
     strategy:
+      fail-fast: false
       matrix:
         arch: [amd64, arm64]
         os: [ubuntu-latest, ubuntu-18.04, windows-latest, macos-11]
@@ -39,6 +40,6 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/release/gitops${{ matrix.artifact_suffix }}
+          file: cmd/gitpos/gitops${{ matrix.artifact_suffix }}
           asset_name: gitops_${{ matrix.os_name }}_${{ matrix.arch }}${{ matrix.artifact_suffix }}
           tag: ${{ github.ref }}
