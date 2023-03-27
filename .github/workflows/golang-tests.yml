@@ -18,6 +18,6 @@ jobs:
       - uses: actions/setup-go@v4
       - name: run golang tests
         run: |
-          export SOPS_AGE_KEY_FILE=${PWD}/test/keys.txt
+          export SOPS_AGE_KEY_FILE=${PWD}/test_assets/keys.txt
           export GITOPS_ROOT_DIR=${PWD}
           go test ./...
