@@ -1,0 +1,19 @@
+name: Golang tests
+
+on:
+  push:
+    branches: [main, golang]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Golang tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions/setup-go@v4
+      - run: |
+          export SOPS_AGE_KEY_FILE=${PWD}/test/keys.txt
+          export GITOPS_ROOT_DIR=${PWD}
+          go test ./...
