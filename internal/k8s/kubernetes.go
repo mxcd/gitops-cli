@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"context"
+	"errors"
 	"os"
 
 	"github.com/mxcd/gitops-cli/internal/secret"
@@ -80,6 +81,22 @@ func CreateSecret(s *secret.Secret) error {
 	return err
 }
 
-func GetSecret(s *secret.Secret) (*v1.Secret, error) {
-	return clientset.CoreV1().Secrets(s.Namespace).Get(context.Background(), s.Name, metav1.GetOptions{})
+func GetSecret(s *secret.Secret) (*secret.Secret, error) {
+	if s.Target != secret.SecretFileTargetKubernetes {
+		return nil, errors.New("secret is not a Kubernetes secret")
+	}
+
+	k8sSecret, err := clientset.CoreV1().Secrets(s.Namespace).Get(context.Background(), s.Name, metav1.GetOptions{})
+	
+	if err != nil {
+		return nil, err
+	}
+
+	return &secret.Secret{
+		Name: k8sSecret.Name,
+		Target: secret.SecretFileTargetKubernetes,
+		Namespace: k8sSecret.Namespace,
+		Data: k8sSecret.StringData,
+		Type: string(k8sSecret.Type),
+	}, nil
 }

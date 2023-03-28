@@ -1,6 +1,7 @@
+- [x] function to compare two local in-memory secrets
+- [x] implement diff view for comparing secrets
 - [ ] function to compare cluster secret and local secret
 - [ ] function to write hash of secret to local file
 - [ ] function to annotate secret with hash and managed-by annotation
 - [ ] implement "--full" sync option, writing all secrets to the cluster
-- [ ] implement diff view for comparing local and cluster secrets
 - [ ] ...

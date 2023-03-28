@@ -2,6 +2,7 @@ package util
 
 import (
 	"io/fs"
+	"math"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -78,4 +79,8 @@ Removes the path and the `gitops.secret.enc.ya?ml` suffix from a given path
 */
 func GetSecretBasename(path string) string {
 	return secretFilenameRegex.ReplaceAllString(filepath.Base(path), "")
+}
+
+func ToRedactedString(s string ) string {
+	return strings.Repeat("*", int(math.Min(float64(len(s)), float64(50))))
 }
