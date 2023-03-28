@@ -4,6 +4,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/mxcd/gitops-cli/internal/k8s"
+	"github.com/mxcd/gitops-cli/internal/secret"
 	"github.com/mxcd/gitops-cli/internal/util"
 	"github.com/schollz/progressbar/v3"
 	log "github.com/sirupsen/logrus"
@@ -20,6 +22,13 @@ func main() {
 				Value: "",
 				Usage: "root directory of the git repository",
 				EnvVars: []string{"GITOPS_ROOT_DIR"},
+			},
+			&cli.StringFlag{
+				Name:  "kubeconfig",
+				Aliases: []string{"k"},
+				Value: "",
+				Usage: "kubeconfig file to use for connecting to the Kubernetes cluster",
+				EnvVars: []string{"KUBECONFIG", "GITOPS_KUBECONFIG"},
 			},
 			&cli.BoolFlag{
 				Name:  "verbose",
@@ -47,14 +56,42 @@ func main() {
 				Usage: "GitOps managed secrets",
 				Subcommands: []*cli.Command{
 					{
-						Name: "push",
+						Name: "apply",
 						Usage: "Push secrets into your infrastructure",
 						Subcommands: []*cli.Command{
 							{
 								Name: "kubernetes",
 								Usage: "Push secrets into a Kubernetes cluster",
 								Action: func(c *cli.Context) error {
-									log.Fatal("Not implemented yet")
+									setLogLevel(c)
+									err := k8s.InitKubernetesClient(c)
+									if err != nil {
+										log.Fatal("Failed to init Kubernetes cluster connection: ", err)
+									}
+									connectionEstablished, err := k8s.TestClusterConnection()
+									if !connectionEstablished || err != nil {
+										log.Fatal("Failed to connect to Kubernetes cluster: ", err)
+									}
+									rootDir := getRootDir(c)
+									secretFiles, err := util.GetSecretFiles(rootDir)
+									if err != nil {
+										log.Fatal(err)
+									}
+									log.Debug(secretFiles)
+
+									
+									for _, secretFile := range secretFiles {
+										log.Trace(secretFile)
+										s, err := secret.FromPath(secretFile)
+										if err != nil {
+											log.Fatal(err)
+										}
+										if s.Target != secret.SecretFileTargetKubernetes {
+											log.Trace("Skipping secret ", s.Name, " with target ", s.Target, " during kubernetes apply")
+											continue
+										}
+										k8s.UpdateSecret(s)
+									}
 									return nil
 								},
 							},

@@ -3,6 +3,8 @@ package secret
 import (
 	"errors"
 
+	"crypto/sha256"
+
 	"github.com/mxcd/gitops-cli/internal/util"
 	"gopkg.in/yaml.v2"
 )
@@ -22,6 +24,12 @@ type Secret struct {
 
 	// optional namespace of the secret
 	Namespace string
+
+	// Decrypted binary data from the secret file
+	BinaryData []byte
+
+	// SHA256 hash of the decrypted binary data
+	BinaryDataHash [32]byte
 
 	// Data is the decrypted data from the secret file
 	Data map[string]string
@@ -48,6 +56,9 @@ func (s *Secret) Load() error {
 	if err != nil {
 		return err
 	}
+
+	s.BinaryData = decryptedFileContent
+	s.BinaryDataHash = sha256.Sum256(decryptedFileContent)
 
 	var secretFile SecretFile
 	yaml.UnmarshalStrict(decryptedFileContent, &secretFile)
@@ -76,4 +87,17 @@ func (s *Secret) Load() error {
 	s.Data = secretFile.Data
 	
 	return nil
+}
+
+func FromPath(path string) (*Secret, error) {
+	s := Secret {
+		Path: path,
+	}
+
+	err := s.Load()
+	if err != nil {
+		return nil, err
+	}
+
+	return &s, nil
 }
