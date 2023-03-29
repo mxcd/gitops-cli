@@ -65,8 +65,9 @@ func TestSecretComparisonTarget(t *testing.T) {
 	assert.Equal(t, false, diff.Equal, "Secrets should not be equal")
 	assert.Equal(t, SecretDiffEntryChanged, diff.Type, "Diff type should be changed")
 	assert.Equal(t, 1, len(diff.Entries), "Diff should have 1 entry")
-	assert.Equal(t, SecretDiffEntryChanged, diff.Entries[0].Type, "DiffEntry type should be changed")
-	assert.Equal(t, "target", diff.Entries[0].Key, "DiffEntry key should be type")
+	entry := diff.GetEntry("target")
+	assert.NotNil(t, entry, "Diff should have an entry for target")
+	assert.Equal(t, SecretDiffEntryChanged, entry.Type, "DiffEntry type should be changed")
 }
 
 func TestSecretComparisonType(t *testing.T) {
@@ -91,8 +92,9 @@ func TestSecretComparisonType(t *testing.T) {
 	assert.Equal(t, false, diff.Equal, "Secrets should not be equal")
 	assert.Equal(t, SecretDiffEntryChanged, diff.Type, "Diff type should be changed")
 	assert.Equal(t, 1, len(diff.Entries), "Diff should have 1 entry")
-	assert.Equal(t, SecretDiffEntryChanged, diff.Entries[0].Type, "DiffEntry type should be changed")
-	assert.Equal(t, "type", diff.Entries[0].Key, "DiffEntry key should be type")
+	entry := diff.GetEntry("type")
+	assert.NotNil(t, entry, "Diff should have an entry for type")
+	assert.Equal(t, SecretDiffEntryChanged, entry.Type, "DiffEntry type should be changed")
 }
 
 func TestSecretComparisonChangedName(t *testing.T) {
@@ -117,8 +119,10 @@ func TestSecretComparisonChangedName(t *testing.T) {
 	assert.Equal(t, false, diff.Equal, "Secrets should not be equal")
 	assert.Equal(t, SecretDiffEntryChanged, diff.Type, "Diff type should be changed")
 	assert.Equal(t, 1, len(diff.Entries), "Diff should have 1 entry")
-	assert.Equal(t, SecretDiffEntryChanged, diff.Entries[0].Type, "DiffEntry type should be changed")
-	assert.Equal(t, "name", diff.Entries[0].Key, "DiffEntry key should be type")
+	
+	entry := diff.GetEntry("name")
+	assert.NotNil(t, entry, "Diff should have an entry for name")
+	assert.Equal(t, SecretDiffEntryChanged, entry.Type, "DiffEntry type should be changed")
 }
 
 func TestSecretComparisonChangedNamespace(t *testing.T) {
@@ -143,8 +147,10 @@ func TestSecretComparisonChangedNamespace(t *testing.T) {
 	assert.Equal(t, false, diff.Equal, "Secrets should not be equal")
 	assert.Equal(t, SecretDiffEntryChanged, diff.Type, "Diff type should be changed")
 	assert.Equal(t, 1, len(diff.Entries), "Diff should have 1 entry")
-	assert.Equal(t, SecretDiffEntryChanged, diff.Entries[0].Type, "DiffEntry type should be changed")
-	assert.Equal(t, "namespace", diff.Entries[0].Key, "DiffEntry key should be type")
+	
+	entry := diff.GetEntry("namespace")
+	assert.NotNil(t, entry, "Diff should have an entry for namespace")
+	assert.Equal(t, SecretDiffEntryChanged, entry.Type, "DiffEntry type should be changed")
 }
 
 func TestSecretComparisonAddData(t *testing.T) {
@@ -172,10 +178,14 @@ func TestSecretComparisonAddData(t *testing.T) {
 	assert.Equal(t, false, diff.Equal, "Secrets should not be equal")
 	assert.Equal(t, SecretDiffEntryChanged, diff.Type, "Diff type should be changed")
 	assert.Equal(t, 2, len(diff.Entries), "Diff should have 2 entry")
-	assert.Equal(t, SecretDiffEntryAdded, diff.Entries[0].Type, "DiffEntry type should be changed")
-	assert.Equal(t, "data.key1", diff.Entries[0].Key, "DiffEntry key should be key1")
-	assert.Equal(t, SecretDiffEntryAdded, diff.Entries[1].Type, "DiffEntry type should be changed")
-	assert.Equal(t, "data.key2", diff.Entries[1].Key, "DiffEntry key should be key1")
+	
+	entry1 := diff.GetEntry("data.key1")
+	assert.NotNil(t, entry1, "Diff should have an entry for data.key1")
+	assert.Equal(t, SecretDiffEntryAdded, entry1.Type, "DiffEntry type should be added")
+	
+	entry2 := diff.GetEntry("data.key2")
+	assert.NotNil(t, entry2, "Diff should have an entry for data.key2")
+	assert.Equal(t, SecretDiffEntryAdded, entry2.Type, "DiffEntry type should be added")
 }
 
 func TestSecretComparisonRemoveData(t *testing.T) {
@@ -203,10 +213,14 @@ func TestSecretComparisonRemoveData(t *testing.T) {
 	assert.Equal(t, false, diff.Equal, "Secrets should not be equal")
 	assert.Equal(t, SecretDiffEntryChanged, diff.Type, "Diff type should be changed")
 	assert.Equal(t, 2, len(diff.Entries), "Diff should have 2 entry")
-	assert.Equal(t, SecretDiffEntryRemoved, diff.Entries[0].Type, "DiffEntry type should be changed")
-	assert.Equal(t, "data.key1", diff.Entries[0].Key, "DiffEntry key should be key1")
-	assert.Equal(t, SecretDiffEntryRemoved, diff.Entries[1].Type, "DiffEntry type should be changed")
-	assert.Equal(t, "data.key2", diff.Entries[1].Key, "DiffEntry key should be key1")
+
+	entry1 := diff.GetEntry("data.key1")
+	assert.NotNil(t, entry1, "Diff should have an entry for data.key1")
+	assert.Equal(t, SecretDiffEntryRemoved, entry1.Type, "DiffEntry type should be removed")
+	
+	entry2 := diff.GetEntry("data.key2")
+	assert.NotNil(t, entry2, "Diff should have an entry for data.key2")
+	assert.Equal(t, SecretDiffEntryRemoved, entry2.Type, "DiffEntry type should be removed")
 }
 
 func TestSecretComparisonChangeData1(t *testing.T) {
@@ -237,8 +251,10 @@ func TestSecretComparisonChangeData1(t *testing.T) {
 	assert.Equal(t, false, diff.Equal, "Secrets should not be equal")
 	assert.Equal(t, SecretDiffEntryChanged, diff.Type, "Diff type should be changed")
 	assert.Equal(t, 1, len(diff.Entries), "Diff should have 1 entry")
-	assert.Equal(t, SecretDiffEntryChanged, diff.Entries[0].Type, "DiffEntry type should be changed")
-	assert.Equal(t, "data.key1", diff.Entries[0].Key, "DiffEntry key should be key1")
+
+	entry1 := diff.GetEntry("data.key1")
+	assert.NotNil(t, entry1, "Diff should have an entry for data.key1")
+	assert.Equal(t, SecretDiffEntryChanged, entry1.Type, "DiffEntry type should be changed")
 }
 
 func TestSecretComparisonChangeData2(t *testing.T) {
@@ -269,10 +285,14 @@ func TestSecretComparisonChangeData2(t *testing.T) {
 	assert.Equal(t, false, diff.Equal, "Secrets should not be equal")
 	assert.Equal(t, SecretDiffEntryChanged, diff.Type, "Diff type should be changed")
 	assert.Equal(t, 2, len(diff.Entries), "Diff should have 2 entry")
-	assert.Equal(t, SecretDiffEntryChanged, diff.Entries[0].Type, "DiffEntry type should be changed")
-	assert.Equal(t, SecretDiffEntryChanged, diff.Entries[1].Type, "DiffEntry type should be changed")
-	assert.Equal(t, "data.key1", diff.Entries[1].Key, "DiffEntry key should be key1")
-	assert.Equal(t, "data.key2", diff.Entries[0].Key, "DiffEntry key should be key2")
+
+	entry1 := diff.GetEntry("data.key1")
+	assert.NotNil(t, entry1, "Diff should have an entry for data.key1")
+	assert.Equal(t, SecretDiffEntryChanged, entry1.Type, "DiffEntry type should be changed")
+	
+	entry2 := diff.GetEntry("data.key2")
+	assert.NotNil(t, entry2, "Diff should have an entry for data.key2")
+	assert.Equal(t, SecretDiffEntryChanged, entry2.Type, "DiffEntry type should be changed")
 }
 
 func TestSecretComparisonChangeData3(t *testing.T) {
@@ -304,14 +324,17 @@ func TestSecretComparisonChangeData3(t *testing.T) {
 	assert.Equal(t, SecretDiffEntryChanged, diff.Type, "Diff type should be changed")
 	assert.Equal(t, 3, len(diff.Entries), "Diff should have 3 entry")
 	
-	assert.Equal(t, SecretDiffEntryChanged, diff.Entries[0].Type, "DiffEntry type should be changed")
-	assert.Equal(t, "data.key1", diff.Entries[0].Key, "DiffEntry key should be key1")
+	entry1 := diff.GetEntry("data.key1")
+	assert.NotNil(t, entry1, "Diff should have an entry for data.key1")
+	assert.Equal(t, SecretDiffEntryChanged, entry1.Type, "DiffEntry type should be added")
+	
+	entry2 := diff.GetEntry("data.key2")
+	assert.NotNil(t, entry2, "Diff should have an entry for data.key2")
+	assert.Equal(t, SecretDiffEntryRemoved, entry2.Type, "DiffEntry type should be removed")
 
-	assert.Equal(t, SecretDiffEntryRemoved, diff.Entries[1].Type, "DiffEntry type should be removed")
-	assert.Equal(t, "data.key2", diff.Entries[1].Key, "DiffEntry key should be key2")
-
-	assert.Equal(t, SecretDiffEntryAdded, diff.Entries[2].Type, "DiffEntry type should be added")
-	assert.Equal(t, "data.key3", diff.Entries[2].Key, "DiffEntry key should be key3")
+	entry3 := diff.GetEntry("data.key3")
+	assert.NotNil(t, entry3, "Diff should have an entry for data.key3")
+	assert.Equal(t, SecretDiffEntryAdded, entry3.Type, "DiffEntry type should be added")
 }
 
 func TestSecretComparisonRemoveSecret(t *testing.T) {
@@ -331,6 +354,14 @@ func TestSecretComparisonRemoveSecret(t *testing.T) {
 	assert.Equal(t, false, diff.Equal, "Secrets should not be equal")
 	assert.Equal(t, SecretDiffEntryRemoved, diff.Type, "Diff type should be removed")
 	assert.Equal(t, 2, len(diff.Entries), "Diff should have 2 entry")
+
+	entry1 := diff.GetEntry("data.key1")
+	assert.NotNil(t, entry1, "Diff should have an entry for data.key1")
+	assert.Equal(t, SecretDiffEntryRemoved, entry1.Type, "DiffEntry type should be removed")
+
+	entry2 := diff.GetEntry("data.key2")
+	assert.NotNil(t, entry1, "Diff should have an entry for data.key2")
+	assert.Equal(t, SecretDiffEntryRemoved, entry2.Type, "DiffEntry type should be removed")
 }
 
 func TestSecretComparisonAddSecret(t *testing.T) {
@@ -350,4 +381,12 @@ func TestSecretComparisonAddSecret(t *testing.T) {
 	assert.Equal(t, false, diff.Equal, "Secrets should not be equal")
 	assert.Equal(t, SecretDiffEntryAdded, diff.Type, "Diff type should be added")
 	assert.Equal(t, 2, len(diff.Entries), "Diff should have 2 entry")
+
+	entry1 := diff.GetEntry("data.key1")
+	assert.NotNil(t, entry1, "Diff should have an entry for data.key1")
+	assert.Equal(t, SecretDiffEntryAdded, entry1.Type, "DiffEntry type should be added")
+
+	entry2 := diff.GetEntry("data.key2")
+	assert.NotNil(t, entry1, "Diff should have an entry for data.key2")
+	assert.Equal(t, SecretDiffEntryAdded, entry2.Type, "DiffEntry type should be added")
 }

@@ -155,7 +155,7 @@ func CompareSecrets(oldSecret *Secret, newSecret *Secret) SecretDiff {
 		for key, value := range newSecret.Data {
 			diffEntries = append(diffEntries, SecretDiffEntry{
 				Type: SecretDiffEntryAdded,
-				Key: key,
+				Key: fmt.Sprintf("data.%s", key),
 				OldValue: "",
 				NewValue: value,
 				Sensitive: true,
@@ -175,7 +175,7 @@ func CompareSecrets(oldSecret *Secret, newSecret *Secret) SecretDiff {
 		for key, value := range oldSecret.Data {
 			diffEntries = append(diffEntries, SecretDiffEntry{
 				Type: SecretDiffEntryRemoved,
-				Key: key,
+				Key: fmt.Sprintf("data.%s", key),
 				OldValue: value,
 				NewValue: "",
 				Sensitive: true,
@@ -337,4 +337,13 @@ func (d *SecretDiff) Print() {
 			println(color.Ize(color.Yellow, fmt.Sprintf("%s: changed", combinedSecretName)))
 	}
 	printDetailedChanges()
+}
+
+func (d *SecretDiff) GetEntry(key string) *SecretDiffEntry {
+	for _, entry := range d.Entries {
+		if entry.Key == key {
+			return &entry
+		}
+	}
+	return nil
 }
