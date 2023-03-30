@@ -1,8 +1,11 @@
 package util
 
 import (
+	"bufio"
+	"fmt"
 	"io/fs"
 	"math"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -30,12 +33,12 @@ func GetSecretFiles(rootDirectory string) ([]string, error) {
 				return err
 			}
 			if strings.Contains(path, ".git") && !strings.Contains(path, ".gitops") {
-				log.Trace("Skipping git directory: ", path)
+				// log.Trace("Skipping git directory: ", path)
 				return nil;
 			}
 
 			if d.IsDir() {
-				log.Trace("Skipping directory: ", path)
+				// log.Trace("Skipping directory: ", path)
 				return nil;
 			}
 
@@ -83,4 +86,17 @@ func GetSecretBasename(path string) string {
 
 func ToRedactedString(s string ) string {
 	return strings.Repeat("*", int(math.Min(float64(len(s)), float64(50))))
+}
+
+func StringPrompt(label string) string {
+	var s string
+	r := bufio.NewReader(os.Stdin)
+	for {
+			fmt.Fprint(os.Stderr, label+" ")
+			s, _ = r.ReadString('\n')
+			if s != "" {
+					break
+			}
+	}
+	return strings.TrimSpace(s)
 }

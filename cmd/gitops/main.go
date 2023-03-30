@@ -61,6 +61,12 @@ func main() {
 								Name: "kubernetes",
 								Aliases: []string{"k8s"},
 								Usage: "Push secrets into a Kubernetes cluster",
+								Flags: []cli.Flag{
+									&cli.BoolFlag{
+										Name: "auto-approve",
+										Usage: "apply the changes without prompting for approval",
+									},
+								},
 								Action: func(c *cli.Context) error {
 									initApplication(c)
 									return applyKubernetes(c)

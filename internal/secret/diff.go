@@ -225,16 +225,16 @@ func (d *SecretDiff) Print() {
 	}
 
 	if d.Equal {
-		println(color.Ize(color.Gray, fmt.Sprintf("%s: no changes", combinedSecretName)))
+		println(color.InGray(combinedSecretName), color.InGray(": "), color.InBold(color.InGray("unchanged")))
 		return
 	}
 	switch d.Type {
 		case SecretDiffTypeAdded:
-			println(color.Ize(color.Green, fmt.Sprintf("%s: add", combinedSecretName)))
+			println(color.InGreen(combinedSecretName), color.InGreen(": "), color.InBold(color.InGreen("add")))
 		case SecretDiffTypeRemoved:
-			println(color.Ize(color.Red, fmt.Sprintf("%s: remove", combinedSecretName)))
+			println(color.InRed(combinedSecretName), color.InRed(": "), color.InBold(color.InRed("remove")))
 		case SecretDiffTypeChanged:
-			println(color.Ize(color.Yellow, fmt.Sprintf("%s: change", combinedSecretName)))
+			println(color.InYellow(combinedSecretName), color.InYellow(": "), color.InBold(color.InYellow("change")))
 	}
 	printDetailedChanges()
 }

@@ -5,12 +5,12 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Launch Package",
+      "name": "gitops secrets apply k8s",
       "type": "go",
       "request": "launch",
       "mode": "auto",
-      "program": "${fileDirname}",
-      "args": ["secrets", "p", "k8s"]
+      "program": "cmd/gitops",
+      "args": ["secrets", "a", "k8s"]
     }
   ]
 }

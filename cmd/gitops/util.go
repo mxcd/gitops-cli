@@ -9,6 +9,7 @@ import (
 )
 
 func initApplication(c *cli.Context) {
+	printLogo(c)
 	setLogLevel(c)
 	getRootDir(c)
 	if c.String("root-dir") == "" {
@@ -47,4 +48,18 @@ func getRootDir(c *cli.Context) {
 			log.Fatal("Root directory does not exist")
 		}
 	}
+}
+
+func printLogo(c *cli.Context) {
+	if c.Bool("no-logo") {
+		return
+	}
+	println("")
+	println("__             _ __")
+	println("\\ \\     ____ _(_) /_____  ____  _____")
+	println(" \\ \\   / __ `/ / __/ __ \\/ __ \\/ ___/")
+	println(" / /  / /_/ / / /_/ /_/ / /_/ (__  )")
+	println("/_/   \\__, /_/\\__/\\____/ .___/____/")
+	println("     /____/           /_/")
+	println("")
 }

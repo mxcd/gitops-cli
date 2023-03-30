@@ -4,4 +4,4 @@
 - [ ] function to write hash of secret to local file
 - [ ] function to annotate secret with hash and managed-by annotation
 - [ ] implement "--full" sync option, writing all secrets to the cluster
-- [ ] ...
+- [ ] when a k8s secret type changes, it has to be removed, first

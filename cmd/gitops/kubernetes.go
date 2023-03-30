@@ -1,9 +1,11 @@
 package main
 
 import (
+	"github.com/TwiN/go-color"
 	"github.com/mxcd/gitops-cli/internal/k8s"
 	"github.com/mxcd/gitops-cli/internal/plan"
 	"github.com/mxcd/gitops-cli/internal/secret"
+	"github.com/mxcd/gitops-cli/internal/util"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -14,13 +16,50 @@ func applyKubernetes(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	p.Execute()
+
+	prettyPrintPlan(p)
+
+	if p.NothingToDo() {
+		println(color.InGreen("No changes to apply."))
+		return nil
+	}
+	
+	if !c.Bool("auto-approve") {
+		println("GitOps CLI will apply these changes to your Kubernetes cluster.")
+		println("Only 'yes' will be accepted to approve.")
+		promtAnswer := util.StringPrompt("Apply changes above: ")
+		
+		if promtAnswer != "yes" {
+			println("Aborting")
+			return nil
+		}
+	}
+
+	println("GitOps CLI will now execute the changes for your cluster:")
+	println("-------------------------------------------------------")
+	println("")
+	err = p.Execute()
+	if err != nil {
+		return err
+	}
+	println("")
+	println("-------------------------------------------------------")
+	println("")
+	println(color.InGreen("All changes applied."))
 	return nil
 }
 
 func planKubernetes(c *cli.Context) error {
-	_, err := createKubernetesPlan(c)
-	return err
+	p, err := createKubernetesPlan(c)
+	if err != nil {
+		return err
+	}
+	prettyPrintPlan(p)
+
+	if p.NothingToDo() {
+		println(color.InGreen("No changes to apply."))
+	}
+	return nil
 }
 
 func createKubernetesPlan(c *cli.Context) (*plan.Plan, error) {
@@ -65,7 +104,15 @@ func createKubernetesPlan(c *cli.Context) (*plan.Plan, error) {
 		p.AddItem(planItem)
 	}
 
-	p.Print()
-
 	return p, nil
+}
+
+func prettyPrintPlan(p *plan.Plan) {
+	println("GitOps CLI computed the following changes for your cluster:")
+	println("-------------------------------------------------------")
+	println("")
+	p.Print()
+	println("")
+	println("-------------------------------------------------------")
+	println("")
 }

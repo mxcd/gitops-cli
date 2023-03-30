@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/TwiN/go-color"
 	"github.com/mxcd/gitops-cli/internal/secret"
 
 	log "github.com/sirupsen/logrus"
@@ -52,7 +53,7 @@ func TestClusterConnection() (bool, error) {
 		log.Error("Failed to connect to Kubernetes cluster: ", err)
 		return false, err
 	}
-	log.Info("Connected to Kubernetes cluster: ", serverVersion)
+	log.Debug("Connected to Kubernetes cluster: ", serverVersion)
 
 	return true, nil
 }
@@ -64,32 +65,33 @@ func CreateSecret(s *secret.Secret) error {
 			Name: s.Name,
 			Namespace: s.Namespace,
 		},
-		Type: v1.SecretTypeOpaque,
+		Type: v1.SecretType(s.Type),
 		StringData: s.Data,
 	}, metav1.CreateOptions{})
 	log.Trace(k8sSecret)
 	if err != nil {
 		return err
 	}
-	log.Info(s.Namespace, "/", s.Name, " created")
+	println(s.Namespace, "/", s.Name, color.InGreen(" created"))
 	return err
 }
 
 func UpdateSecret(s *secret.Secret) error {
 	log.Trace("Updating secret ", s.Name, " in namespace ", s.Namespace)
+
 	k8sSecret, err := clientset.CoreV1().Secrets(s.Namespace).Update(context.Background(), &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: s.Name,
 			Namespace: s.Namespace,
 		},
-		Type: v1.SecretTypeOpaque,
+		Type: v1.SecretType(s.Type),
 		StringData: s.Data,
 	}, metav1.UpdateOptions{})
 	log.Trace(k8sSecret)
 	if err != nil {
 		return err
 	}
-	log.Info(s.Namespace, "/", s.Name, " updated")
+	println(s.Namespace, "/", s.Name, color.InYellow(" updated"))
 	return err
 }
 
@@ -99,7 +101,7 @@ func DeleteSecret(s *secret.Secret) error {
 	if err != nil {
 		return err
 	}
-	log.Info(s.Namespace, "/", s.Name, " deleted")
+	println(s.Namespace, "/", s.Name, color.InRed(" deleted"))
 	return err
 }
 
@@ -114,7 +116,17 @@ func GetSecret(s *secret.Secret) (*secret.Secret, error) {
 		Name: k8sSecret.Name,
 		Target: secret.SecretTargetKubernetes,
 		Namespace: k8sSecret.Namespace,
-		Data: k8sSecret.StringData,
+		Data: getStringData(k8sSecret),
 		Type: string(k8sSecret.Type),
 	}, nil
+}
+
+
+
+func getStringData(s *v1.Secret) map[string]string {
+	stringData := make(map[string]string)
+	for key, value := range s.Data {
+		stringData[key] = string(value)
+	}
+	return stringData
 }

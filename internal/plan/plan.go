@@ -27,39 +27,67 @@ func (p *Plan) AddItem(item PlanItem) {
 	p.Items = append(p.Items, item)
 }
 
+func (p *Plan) NothingToDo() bool {
+	for _, item := range p.Items {
+		if !item.Diff.Equal {
+			return false
+		}
+	}
+	return true
+}
+
 func (i *PlanItem) ComputeDiff() {
 	i.Diff = secret.CompareSecrets(i.RemoteSecret, i.LocalSecret)
 }
 
 func (p *Plan) Print() {
-	for _, item := range p.Items {
+	for i, item := range p.Items {
 		item.Diff.Print()
+		if i < len(p.Items)-1 {
+			println("---")
+		}
 	}
 }
 
-func (p *Plan) Execute() {
+func (p *Plan) Execute() error {
 	if p.Target == secret.SecretTargetKubernetes {
-		executeKubernetesPlan(p)
+		return executeKubernetesPlan(p)
+
 	} else if p.Target == secret.SecretTargetVault {
 		log.Fatal("Not implemented")
+		return nil
 	}
+	return nil
 }
 
-func executeKubernetesPlan(p *Plan) {
+func executeKubernetesPlan(p *Plan) error {
 	for _, item := range p.Items {
 		if item.Diff.Equal {
-			log.Trace("Secret ", item.LocalSecret.Name, " is equal, skipping")
+			log.Trace("Secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " is equal, skipping...")
 			continue
 		}
 		if item.Diff.Type == secret.SecretDiffTypeAdded {
-			log.Trace("Secret ", item.LocalSecret.Name, " is new, creating")
-			k8s.CreateSecret(item.LocalSecret)
+			log.Trace("Secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " is new, creating...")
+			err := k8s.CreateSecret(item.LocalSecret)
+			if err != nil {
+				log.Error("Failed to create secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " in cluster")
+				return err
+			}
 		} else if item.Diff.Type == secret.SecretDiffTypeChanged {
-			log.Trace("Secret ", item.LocalSecret.Name, " is modified, updating")
-			k8s.UpdateSecret(item.LocalSecret)
+			log.Trace("Secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " is modified, updating...")
+			err := k8s.UpdateSecret(item.LocalSecret)
+			if err != nil {
+				log.Error("Failed to update secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " in cluster")
+				return err
+			}
 		} else if item.Diff.Type == secret.SecretDiffTypeRemoved {
-			log.Trace("Secret ", item.LocalSecret.Name, " is deleted, deleting")
-			k8s.DeleteSecret(item.LocalSecret)
+			log.Trace("Secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " is deleted, deleting...")
+			err := k8s.DeleteSecret(item.LocalSecret)
+			if err != nil {
+				log.Error("Failed to delete secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " in cluster")
+				return err
+			}
 		}
 	}
+	return nil
 }
