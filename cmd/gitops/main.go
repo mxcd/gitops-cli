@@ -4,9 +4,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/mxcd/gitops-cli/internal/k8s"
-	"github.com/mxcd/gitops-cli/internal/secret"
-	"github.com/mxcd/gitops-cli/internal/util"
 	"github.com/schollz/progressbar/v3"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -57,42 +54,16 @@ func main() {
 				Subcommands: []*cli.Command{
 					{
 						Name: "apply",
+						Aliases: []string{"a"},
 						Usage: "Push secrets into your infrastructure",
 						Subcommands: []*cli.Command{
 							{
 								Name: "kubernetes",
+								Aliases: []string{"k8s"},
 								Usage: "Push secrets into a Kubernetes cluster",
 								Action: func(c *cli.Context) error {
-									setLogLevel(c)
-									err := k8s.InitKubernetesClient(c)
-									if err != nil {
-										log.Fatal("Failed to init Kubernetes cluster connection: ", err)
-									}
-									connectionEstablished, err := k8s.TestClusterConnection()
-									if !connectionEstablished || err != nil {
-										log.Fatal("Failed to connect to Kubernetes cluster: ", err)
-									}
-									rootDir := getRootDir(c)
-									secretFiles, err := util.GetSecretFiles(rootDir)
-									if err != nil {
-										log.Fatal(err)
-									}
-									log.Debug(secretFiles)
-
-									
-									for _, secretFile := range secretFiles {
-										log.Trace(secretFile)
-										s, err := secret.FromPath(secretFile)
-										if err != nil {
-											log.Fatal(err)
-										}
-										if s.Target != secret.SecretFileTargetKubernetes {
-											log.Trace("Skipping secret ", s.Name, " with target ", s.Target, " during kubernetes apply")
-											continue
-										}
-										k8s.UpdateSecret(s)
-									}
-									return nil
+									initApplication(c)
+									return applyKubernetes(c)
 								},
 							},
 							{
@@ -106,24 +77,28 @@ func main() {
 						},
 					},
 					{
-						Name: "test",
+						Name: "plan",
+						Aliases: []string{"p"},
+						Usage: "Plan the application of secrets into your infrastructure",
+						Subcommands: []*cli.Command{
+							{
+								Name: "kubernetes",
+								Aliases: []string{"k8s"},
+								Usage: "Plan the application of secrets into a Kubernetes cluster",
+
+								Action: func(c *cli.Context) error {
+									initApplication(c)
+									return planKubernetes(c)
+								},
+							},
+						},
+					},
+					{
+						Name: "template",
 						Usage: "Test the templating of secrets",
 						Action: func(c *cli.Context) error {
-							setLogLevel(c)
-							rootDir := getRootDir(c)
-							secretFiles, err := util.GetSecretFiles(rootDir)
-							if err != nil {
-								log.Fatal(err)
-							}
-							for _, secretFile := range secretFiles {
-								log.Debug(secretFile)
-								decryptedFile, err := util.DecryptFile(secretFile)
-								if err != nil {
-									log.Fatal(err)
-								}
-								log.Trace(string(decryptedFile))
-							}
-							return nil
+							initApplication(c)
+							return testTemplating(c)
 						},
 					},
 				},
@@ -135,10 +110,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-func GetGitRepoRoot() {
-	panic("unimplemented")
 }
 
 func barTest() {
@@ -160,14 +131,3 @@ func barTest() {
 	}
 }
 
-func setLogLevel(c *cli.Context) {
-	log.SetLevel(log.InfoLevel)
-	
-	if c.Bool("verbose") {
-		log.SetLevel(log.DebugLevel)
-	}
-
-	if c.Bool("very-verbose") {
-		log.SetLevel(log.TraceLevel)
-	}
-}
