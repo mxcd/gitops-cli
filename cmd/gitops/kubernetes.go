@@ -58,6 +58,8 @@ func planKubernetes(c *cli.Context) error {
 
 	if p.NothingToDo() {
 		println(color.InGreen("No changes to apply."))
+	} else {
+		println(color.InBold("use"), color.InGreen(color.InBold("gitops secrets apply kubernetes")), color.InBold("to apply these changes to your cluster"))
 	}
 	return nil
 }

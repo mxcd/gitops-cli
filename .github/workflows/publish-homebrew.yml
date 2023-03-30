@@ -1,0 +1,19 @@
+name: Publish homebrew
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  test:
+    name: Publish homebrew formula
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions/setup-go@v4
+        with:
+          go-version: 1.19
+      - name: retrieve release tar sha256
+        run: curl -sL "${{ github.server_url }}/${{ github.repository }}/archive/refs/tags/${{ github.ref_name }}.tar.gz" | shasum -a 256 | cut -d " " -f 1 > sha256.txt
+      - name: print sha256
+        run: cat sha256.txt
