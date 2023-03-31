@@ -17,3 +17,5 @@ jobs:
         run: curl -sL "${{ github.server_url }}/${{ github.repository }}/archive/refs/tags/${{ github.ref_name }}.tar.gz" | shasum -a 256 | cut -d " " -f 1 > sha256.txt
       - name: print sha256
         run: cat sha256.txt
+      - name: publish homebrew formula
+        run: ./.github/scripts/homebrew/publish.sh 
