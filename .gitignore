@@ -2,6 +2,8 @@
 *.secret.yml
 *.secret.env
 
+homebrew-gitops/
+
 # Ignore "main" binary
 main
 # Ignore "gitops" binary

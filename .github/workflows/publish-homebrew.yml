@@ -18,4 +18,4 @@ jobs:
       - name: print sha256
         run: cat sha256.txt
       - name: publish homebrew formula
-        run: ./.github/scripts/homebrew/publish.sh 
+        run: ./.github/scripts/homebrew/publish.sh -u mxcd -t ${{ secrets.CI_PAT }} -v ${{ github.ref_name }} -s $(cat sha256.txt)

@@ -53,7 +53,7 @@ fi
 log "Publishing version $VERSION with SHA $SHA"
 
 cd $BASE
-git clone https://$USERNAME:$TOKEN@github.com/homebrew-gitops.git 
+git clone https://$USERNAME:$TOKEN@github.com/mxcd/homebrew-gitops.git 
 export RELEASE_SHA256="$SHA"
 export RELEASE_VERSION="$VERSION"
 
