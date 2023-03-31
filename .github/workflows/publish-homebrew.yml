@@ -12,8 +12,8 @@ jobs:
       - uses: actions/checkout@master
       - name: Setup git user
         run: |
-          git config user.name "GitOps CLI Release Bot"
-          git config user.email "robot@gitops-cli.net"
+          git config --global user.name "$(git --no-pager log --format=format:'%an' -n 1)"
+          git config --global user.email "$(git --no-pager log --format=format:'%ae' -n 1)"
       - name: retrieve release tar sha256
         run: curl -sL "${{ github.server_url }}/${{ github.repository }}/archive/refs/tags/${{ github.ref_name }}.tar.gz" | shasum -a 256 | cut -d " " -f 1 > sha256.txt
       - name: print sha256
