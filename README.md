@@ -13,6 +13,17 @@ __             _ __
 
 CLI tool for performing GitOps operations
 
+## Installation
+
+### MacOS
+
+Install using homebrew:
+
+```bash
+brew tap mxcd/gitops
+brew install gitops
+```
+
 ## Features
 
 ### GitOps secret management
@@ -79,7 +90,7 @@ my-secret-name.gitops.secret.enc.yaml
 name: my-secret-name
 ```
 
-This implies, that the filename must be a valid K8s secret name.  
+This implies, that the filename must be a valid K8s secret name.
 
 ## Repository
 

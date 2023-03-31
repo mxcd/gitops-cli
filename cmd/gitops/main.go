@@ -42,13 +42,6 @@ func main() {
 		},
 		Commands: []*cli.Command{
 			{
-				Name: "bar",
-				Action: func(c *cli.Context) error {
-					barTest()
-					return nil
-				},
-			},
-			{
 				Name: "secrets",
 				Usage: "GitOps managed secrets",
 				Subcommands: []*cli.Command{
