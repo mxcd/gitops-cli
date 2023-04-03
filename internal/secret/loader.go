@@ -1,6 +1,8 @@
 package secret
 
-import "github.com/mxcd/gitops-cli/internal/util"
+import (
+	"github.com/mxcd/gitops-cli/internal/util"
+)
 
 /*
 	Loads all the secrets from the local file system

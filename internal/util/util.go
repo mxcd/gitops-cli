@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/urfave/cli/v2"
 	"go.mozilla.org/sops/v3/decrypt"
 )
 
@@ -44,7 +45,13 @@ func GetSecretFiles(rootDirectory string) ([]string, error) {
 
 			if secretFileRegex.MatchString(path) {
 				log.Debug("Found secret file: ", path)
-				secretFiles = append(secretFiles, path)
+				relativePath, err := filepath.Rel(rootDirectory, path)
+				if err != nil {
+					log.Error("An error occurred while getting the relative path of the secret file")
+					log.Error(err)
+					return err
+				}
+				secretFiles = append(secretFiles, relativePath)
 			}
 			return nil
 		})
@@ -99,4 +106,36 @@ func StringPrompt(label string) string {
 			}
 	}
 	return strings.TrimSpace(s)
+}
+
+var cliContext *cli.Context
+func SetCliContext(c *cli.Context) {
+	cliContext = c
+}
+func getCliContext() *cli.Context {
+	return cliContext
+}
+func GetRootDir() string {
+	return getCliContext().String("root-dir")
+}
+
+func ComputeRootDir(c *cli.Context) {
+	var rootDir string
+	if c.String("root-dir") != "" {
+		log.Trace("Using root-dir flag")
+	} else {
+		log.Trace("Using git repo root")
+		var err error
+		rootDir, err = GetGitRepoRoot()
+		if err != nil {
+			log.Fatal(err)
+		}
+		c.Set("root-dir", rootDir)
+		log.Trace("Using root directory: '", rootDir, "'")
+
+		_, err = os.Stat(c.String("root-dir"))
+		if os.IsNotExist(err) {
+			log.Fatal("Root directory does not exist")
+		}
+	}
 }

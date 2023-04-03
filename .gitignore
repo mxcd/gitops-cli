@@ -3,6 +3,7 @@
 *.secret.env
 
 homebrew-gitops/
+.gitops-state.yaml
 
 # Ignore "main" binary
 main

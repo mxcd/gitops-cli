@@ -10,7 +10,7 @@
       "request": "launch",
       "mode": "auto",
       "program": "cmd/gitops",
-      "args": ["secrets", "a", "k8s"]
+      "args": ["secrets", "a", "k8s", "-auto-approve"]
     }
   ]
 }

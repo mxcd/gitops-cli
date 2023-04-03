@@ -1,7 +1,9 @@
 package secret
 
 import (
+	"encoding/hex"
 	"errors"
+	"path"
 
 	"crypto/sha256"
 
@@ -31,7 +33,7 @@ type Secret struct {
 	BinaryData []byte
 
 	// SHA256 hash of the decrypted binary data
-	BinaryDataHash [32]byte
+	BinaryDataHash string
 
 	// Data is the decrypted data from the secret file
 	Data map[string]string
@@ -56,13 +58,16 @@ func (s *Secret) Load() error {
 		return errors.New("secret path is empty")
 	}
 
-	decryptedFileContent, err := util.DecryptFile(s.Path)
+	absoluteSecretPath := path.Join(util.GetRootDir(), s.Path)
+	decryptedFileContent, err := util.DecryptFile(absoluteSecretPath)
 	if err != nil {
 		return err
 	}
 
 	s.BinaryData = decryptedFileContent
-	s.BinaryDataHash = sha256.Sum256(decryptedFileContent)
+	binaryHash := sha256.Sum256(decryptedFileContent)
+	hash := binaryHash[:]
+	s.BinaryDataHash = hex.EncodeToString(hash)
 
 	var secretFile SecretFile
 	yaml.UnmarshalStrict(decryptedFileContent, &secretFile)
@@ -91,6 +96,10 @@ func (s *Secret) Load() error {
 	s.Data = secretFile.Data
 	
 	return nil
+}
+
+func (s *Secret) CombinedName() string {
+	return s.Namespace + "/" + s.Name
 }
 
 func FromPath(path string) (*Secret, error) {

@@ -1,20 +1,30 @@
 package main
 
 import (
-	"os"
-
+	"github.com/mxcd/gitops-cli/internal/state"
 	"github.com/mxcd/gitops-cli/internal/util"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
 
-func initApplication(c *cli.Context) {
+func initApplication(c *cli.Context) error  {
 	printLogo(c)
 	setLogLevel(c)
-	getRootDir(c)
+	util.ComputeRootDir(c)
+	util.SetCliContext(c)
 	if c.String("root-dir") == "" {
 		log.Fatal("No root directory specified")
 	}
+	err := state.LoadState(c)
+	return err
+}
+
+func exitApplication(c *cli.Context, writeState bool) error {
+	var err error
+	if writeState {
+		err = state.GetState().Save(c)
+	}
+	return err
 }
 
 func setLogLevel(c *cli.Context) {
@@ -26,27 +36,6 @@ func setLogLevel(c *cli.Context) {
 
 	if c.Bool("very-verbose") {
 		log.SetLevel(log.TraceLevel)
-	}
-}
-
-func getRootDir(c *cli.Context) {
-	var rootDir string
-	if c.String("root-dir") != "" {
-		log.Trace("Using root-dir flag")
-	} else {
-		log.Trace("Using git repo root")
-		var err error
-		rootDir, err = util.GetGitRepoRoot()
-		if err != nil {
-			log.Fatal(err)
-		}
-		c.Set("root-dir", rootDir)
-		log.Trace("Using root directory: '", rootDir, "'")
-
-		_, err = os.Stat(c.String("root-dir"))
-		if os.IsNotExist(err) {
-			log.Fatal("Root directory does not exist")
-		}
 	}
 }
 

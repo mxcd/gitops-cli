@@ -81,10 +81,10 @@ func executeKubernetesPlan(p *Plan) error {
 				return err
 			}
 		} else if item.Diff.Type == secret.SecretDiffTypeRemoved {
-			log.Trace("Secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " is deleted, deleting...")
-			err := k8s.DeleteSecret(item.LocalSecret)
+			log.Trace("Secret ", item.RemoteSecret.Namespace, "/", item.RemoteSecret.Name, " is deleted, deleting...")
+			err := k8s.DeleteSecret(item.RemoteSecret)
 			if err != nil {
-				log.Error("Failed to delete secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " in cluster")
+				log.Error("Failed to delete secret ", item.RemoteSecret.Namespace, "/", item.RemoteSecret.Name, " in cluster")
 				return err
 			}
 		}

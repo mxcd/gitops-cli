@@ -3,6 +3,7 @@ module github.com/mxcd/gitops-cli
 go 1.19
 
 require (
+	github.com/google/uuid v1.1.2
 	github.com/schollz/progressbar/v3 v3.13.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/urfave/cli/v2 v2.25.0

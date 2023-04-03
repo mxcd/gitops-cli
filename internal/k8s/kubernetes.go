@@ -64,6 +64,9 @@ func CreateSecret(s *secret.Secret) error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: s.Name,
 			Namespace: s.Namespace,
+			Annotations: map[string]string{
+				"gitops.mxcd.de/secret-id": s.ID,
+			},
 		},
 		Type: v1.SecretType(s.Type),
 		StringData: s.Data,
@@ -83,6 +86,9 @@ func UpdateSecret(s *secret.Secret) error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: s.Name,
 			Namespace: s.Namespace,
+			Annotations: map[string]string{
+				"gitops.mxcd.de/secret-id": s.ID,
+			},
 		},
 		Type: v1.SecretType(s.Type),
 		StringData: s.Data,
