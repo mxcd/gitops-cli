@@ -19,7 +19,7 @@ import (
 // go over all files in the current directory (recursively)
 // and find all files that end with .secret.enc.yaml or .secret.enc.yml
 // return a list of these files
-func GetSecretFiles(rootDirectory string) ([]string, error) {
+func GetSecretFiles() ([]string, error) {
 	log.Trace("Searching for secret files in given directory")
 
 	secretFileRegex, err := regexp.Compile(`.*\.gitops\.secret\.enc\.ya?ml$`)
@@ -28,7 +28,7 @@ func GetSecretFiles(rootDirectory string) ([]string, error) {
 	}
 
 	var secretFiles []string
-	err = filepath.WalkDir(rootDirectory,
+	err = filepath.WalkDir(GetRootDir(),
 		func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err
@@ -45,7 +45,7 @@ func GetSecretFiles(rootDirectory string) ([]string, error) {
 
 			if secretFileRegex.MatchString(path) {
 				log.Debug("Found secret file: ", path)
-				relativePath, err := filepath.Rel(rootDirectory, path)
+				relativePath, err := filepath.Rel(GetRootDir(), path)
 				if err != nil {
 					log.Error("An error occurred while getting the relative path of the secret file")
 					log.Error(err)
@@ -113,29 +113,52 @@ func SetCliContext(c *cli.Context) {
 	cliContext = c
 }
 func getCliContext() *cli.Context {
+	if cliContext == nil {
+		cliContext = GetDummyCliContext()
+	}
 	return cliContext
 }
+
+var _rootDir = ""
 func GetRootDir() string {
-	return getCliContext().String("root-dir")
+	if _rootDir == "" {
+		ComputeRootDir(getCliContext())
+	}
+	return _rootDir
 }
 
 func ComputeRootDir(c *cli.Context) {
-	var rootDir string
 	if c.String("root-dir") != "" {
 		log.Trace("Using root-dir flag")
+		_rootDir = c.String("root-dir")
 	} else {
 		log.Trace("Using git repo root")
 		var err error
-		rootDir, err = GetGitRepoRoot()
+		_rootDir, err = GetGitRepoRoot()
 		if err != nil {
 			log.Fatal(err)
 		}
-		c.Set("root-dir", rootDir)
-		log.Trace("Using root directory: '", rootDir, "'")
+		log.Trace("Using root directory: '", _rootDir, "'")
 
-		_, err = os.Stat(c.String("root-dir"))
+		_, err = os.Stat(_rootDir)
 		if os.IsNotExist(err) {
-			log.Fatal("Root directory does not exist")
+			log.Fatal("Root directory '", _rootDir, "' does not exist")
 		}
 	}
+}
+
+func GetDummyCliContext() *cli.Context {
+	app := &cli.App{
+		Name:  "gitpos",
+		Usage: "GitOps CLI",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "root-dir",
+				Value: "",
+				Usage: "root directory of the git repository",
+				EnvVars: []string{"GITOPS_ROOT_DIR"},
+			},
+		},
+	}
+	return cli.NewContext(app, nil, nil)
 }

@@ -3,6 +3,7 @@ package templating
 import (
 	"testing"
 
+	"github.com/mxcd/gitops-cli/internal/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -76,28 +77,28 @@ func TestMapMerge4(t *testing.T) {
 func TestTemplateValuesMerge(t *testing.T) {
 	templateValues := TemplateValues{
 		&TemplateValuesPath{
-			Path: "foo",
+			Path: "fooboo/",
 			Values: map[interface{}]interface{}{
 				"a": "1",
 				"b": "2",
 			},
 		},
 		&TemplateValuesPath{
-			Path: "foo/bar",
+			Path: "fooboo/bar/",
 			Values: map[interface{}]interface{}{
 				"a": "11",
 				"c": "33",
 			},
 		},
 		&TemplateValuesPath{
-			Path: "fizz",
+			Path: "fizz/",
 			Values: map[interface{}]interface{}{
 				"a": "5",
 				"b": "6",
 			},
 		},
 		&TemplateValuesPath{
-			Path: "fizz/buzz",
+			Path: "fizz/buzz/",
 			Values: map[interface{}]interface{}{
 				"a": "55",
 				"c": "77",
@@ -107,7 +108,7 @@ func TestTemplateValuesMerge(t *testing.T) {
 
 	expectedMergedTemplateValues := TemplateValues{
 		&TemplateValuesPath{
-			Path: "foo",
+			Path: "fooboo/",
 			Values: map[interface{}]interface{}{
 				"a": "1",
 				"b": "2",
@@ -118,7 +119,7 @@ func TestTemplateValuesMerge(t *testing.T) {
 			},
 		},
 		&TemplateValuesPath{
-			Path: "fizz",
+			Path: "fizz/",
 			Values: map[interface{}]interface{}{
 				"a": "5",
 				"b": "6",
@@ -129,7 +130,7 @@ func TestTemplateValuesMerge(t *testing.T) {
 			},
 		},
 		&TemplateValuesPath{
-			Path: "foo/bar",
+			Path: "fooboo/bar/",
 			Values: map[interface{}]interface{}{
 				"a": "11",
 				"c": "33",
@@ -141,7 +142,7 @@ func TestTemplateValuesMerge(t *testing.T) {
 			},
 		},
 		&TemplateValuesPath{
-			Path: "fizz/buzz",
+			Path: "fizz/buzz/",
 			Values: map[interface{}]interface{}{
 				"a": "55",
 				"c": "77",
@@ -154,6 +155,35 @@ func TestTemplateValuesMerge(t *testing.T) {
 		},
 	}
 
-	templateValues.Merge()
+	templateValues.merge()
 	assert.Equal(t, expectedMergedTemplateValues, templateValues, "TemplateValues should be equal")
+}
+
+
+func TestValuesFileLoading(t *testing.T) {
+	c := util.GetDummyCliContext()
+	util.SetCliContext(c)
+	util.ComputeRootDir(c)
+	
+	LoadValues()
+	
+	valuesSet1 := map[interface{}]interface{}{
+		"namespace": "gitops-dev",
+		"stage": "dev",
+		"databaseUsername": "my-very-strong-username",
+		"databasePassword": "my-very-strong-password",
+	}
+
+	mergedValues1 := GetValuesForPath("test_assets/implicit-name.gitops.secret.enc.yml")
+	assert.Equal(t, valuesSet1, mergedValues1, "Values should be equal")
+
+	valuesSet2 := map[interface{}]interface{}{
+		"namespace": "gitops-dev",
+		"stage": "sub-dev",
+		"databaseUsername": "my-very-strong-username",
+		"databasePassword": "my-very-strong-password",
+		"key": "fooo",
+	}
+	mergedValues2 := GetValuesForPath("test_assets/subdirectory/subdir-secret.gitops.secret.enc.yml")
+	assert.Equal(t, valuesSet2, mergedValues2, "Values should be equal")
 }

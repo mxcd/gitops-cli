@@ -1,9 +1,13 @@
 package templating
 
 import (
+	"fmt"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/mxcd/gitops-cli/internal/util"
 	"gopkg.in/yaml.v2"
@@ -18,8 +22,9 @@ type TemplateValuesPath struct {
 	MergedValues  map[interface{}]interface{}
 }
 
-func Load() error {
-	secretFiles, err := util.GetSecretFiles(util.GetRootDir())
+var loaded = false
+func LoadValues() error {
+	secretFiles, err := util.GetSecretFiles()
 	if err != nil {
 		return err
 	}
@@ -39,10 +44,13 @@ func Load() error {
 		var values map[interface{}]interface{}
 		yaml.UnmarshalStrict(decryptedFileContent, &values)
 		templateValues = append(templateValues, &TemplateValuesPath{
-			Path:    valuesFile,
+			Path:    fmt.Sprintf("%s/", filepath.Dir(valuesFile)),
 			Values:  values,
 		})
 	}
+
+	templateValues.merge()
+	loaded = true
 	return nil
 }
 
@@ -67,7 +75,7 @@ func mergeMaps(a, b map[interface{}]interface{}) map[interface{}]interface{} {
 	return out
 }
 
-func (t TemplateValues) Merge() {
+func (t TemplateValues) merge() {
 	sort.SliceStable(t, func(i, j int) bool {
 		return len(strings.Split(t[i].Path, "/")) < len(strings.Split(t[j].Path, "/"))
 	})
@@ -88,4 +96,22 @@ func (t TemplateValues) Merge() {
 			templateValue.MergedValues = templateValue.Values
 		}
 	}
+}
+
+func GetValuesForPath(path string) map[interface{}]interface{} {
+	if !loaded {
+		err := LoadValues()
+		if err != nil {
+			log.Panic(err)
+		}
+	}
+	values := map[interface{}]interface{}{}
+	maxPathLength := 0
+	for _, templateValue := range templateValues {
+		if strings.HasPrefix(path, templateValue.Path) && len(templateValue.Path) > maxPathLength {
+			maxPathLength = len(templateValue.Path)
+			values = templateValue.MergedValues
+		}
+	}
+	return values
 }

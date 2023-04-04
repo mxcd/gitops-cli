@@ -8,7 +8,7 @@ import (
 )
 
 func TestLoadSecret1(t *testing.T) {
-	f := filepath.Join("..", "..", "test_assets", "test.gitops.secret.enc.yml")
+	f := filepath.Join("test_assets", "test.gitops.secret.enc.yml")
 	secret := Secret {
 		Path: f,
 	}
@@ -27,7 +27,7 @@ func TestLoadSecret1(t *testing.T) {
 }
 
 func TestLoadSecret2(t *testing.T) {
-	f := filepath.Join("..", "..", "test_assets", "implicit-name.gitops.secret.enc.yml")
+	f := filepath.Join("test_assets", "implicit-name.gitops.secret.enc.yml")
 	secret := Secret {
 		Path: f,
 	}

@@ -10,11 +10,8 @@ import (
 func initApplication(c *cli.Context) error  {
 	printLogo(c)
 	setLogLevel(c)
-	util.ComputeRootDir(c)
 	util.SetCliContext(c)
-	if c.String("root-dir") == "" {
-		log.Fatal("No root directory specified")
-	}
+	util.GetRootDir()
 	err := state.LoadState(c)
 	return err
 }
