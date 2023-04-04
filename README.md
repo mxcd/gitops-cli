@@ -35,8 +35,8 @@ the secrets are stored in a Git repository and secured using SOPS.
 #### Secret storage
 
 Secrets are stored in any directory of your git repository. The GitOps CLI will pick
-up any file that ends with `*.gitops.secret.enc.yml` or `*.gitops.secret.enc.yaml`. The secret files
-must be encrypted using SOPS.
+up any file that ends with `*.gitops.secret.enc.y[a]ml` except for `values.gitops.secret.enc.y[a]ml` (see [Secrets Templating](#secrets-templating))
+The secret files must be encrypted using SOPS.
 
 **NOTE:** Secrets MUST NEVER be committed into version control unencrypted.
 Therefore, it is very much encouraged to add the following lines to your `.gitignore` file:
@@ -91,6 +91,12 @@ name: my-secret-name
 ```
 
 This implies, that the filename must be a valid K8s secret name.
+
+#### Secrets Templating
+
+It is possible to use Go templates in the secret files. The values will originate from sops-encrypted `values.gitops.secret.enc.y[a]ml` files.  
+Values files can be located anywhere in the repository. The GitOps CLI will pick up all files that are located on the direct path towards the respective secret file.  
+Values files closer to the secret file will have higher precedence. Any object structure is allowed to be used in a values file.
 
 ## Repository
 

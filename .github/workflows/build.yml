@@ -12,13 +12,10 @@ jobs:
       fail-fast: false
       matrix:
         arch: [amd64, arm64]
-        os: [ubuntu-latest, ubuntu-18.04, windows-latest, macos-11]
+        os: [ubuntu-latest, windows-latest, macos-11]
         include:
           - os: ubuntu-latest
             os_name: ubuntu
-            artifact_suffix: ""
-          - os: ubuntu-18.04
-            os_name: ubuntu-18.04
             artifact_suffix: ""
           - os: windows-latest
             os_name: windows
