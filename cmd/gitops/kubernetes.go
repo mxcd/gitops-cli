@@ -147,6 +147,7 @@ func createKubernetesPlan(c *cli.Context) (*plan.Plan, error) {
 		remoteSecret, err := k8s.GetSecret(&secret.Secret{
 			Name: stateSecret.Name,
 			Namespace: stateSecret.Namespace,
+			Type: stateSecret.Type,
 		})
 		if err != nil {
 			// only throw error if err is not "not found"
