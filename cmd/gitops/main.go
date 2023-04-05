@@ -43,6 +43,7 @@ func main() {
 		Commands: []*cli.Command{
 			{
 				Name: "secrets",
+				Aliases: []string{"s"},
 				Usage: "GitOps managed secrets",
 				Subcommands: []*cli.Command{
 					{

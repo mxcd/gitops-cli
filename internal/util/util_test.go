@@ -8,11 +8,7 @@ import (
 )
 
 func TestGetSecretFiles(t *testing.T) {
-	rootDir, err := GetGitRepoRoot()
-	if err != nil {
-		t.Error(err)
-	}
-	secretFiles, err := GetSecretFiles(rootDir)
+	secretFiles, err := GetSecretFiles()
 	if err != nil {
 		t.Error(err)
 	}

@@ -7,6 +7,7 @@ import (
 	"path"
 
 	"github.com/mxcd/gitops-cli/internal/secret"
+	"github.com/mxcd/gitops-cli/internal/util"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v2"
 )
@@ -25,6 +26,8 @@ type SecretState struct {
 	Name string
 	// Namespace of the secret
 	Namespace string
+	// Type of the secret
+	Type string
 	// Path is the path to the secret file
 	Path string
 	// SHA256 hash of the decrypted secret file
@@ -35,7 +38,7 @@ var state *State
 
 func LoadState(c *cli.Context) error {
 	// Load state from project root
-	stateFileName := path.Join(c.String("root-dir"), ".gitops-state.yaml")
+	stateFileName := path.Join(util.GetRootDir(), ".gitops-state.yaml")
 	stats, err := os.Stat(stateFileName)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -63,7 +66,7 @@ func LoadState(c *cli.Context) error {
 
 func (s *State) Save(c *cli.Context) error {
 	// Save state to project root
-	stateFileName := path.Join(c.String("root-dir"), ".gitops-state.yaml")
+	stateFileName := path.Join(util.GetRootDir(), ".gitops-state.yaml")
 	yamlFile, err := yaml.Marshal(s)
 	if err != nil {
 		return err
@@ -88,17 +91,20 @@ func (s *State) Add(secret *secret.Secret) *SecretState {
 		BinaryDataHash: secret.BinaryDataHash,
 		Name: secret.Name,
 		Namespace: secret.Namespace,
+		Type: secret.Type,
 	}
 	s.Secrets = append(s.Secrets, stateSecret)
 	return stateSecret
 }
 
+// TODO prohibit update of the secret type
 func (s *SecretState) Update(secret *secret.Secret) {
 	secret.ID = s.ID
 	s.Target = secret.Target
 	s.Name = secret.Name
 	s.Namespace = secret.Namespace
 	s.BinaryDataHash = secret.BinaryDataHash
+	s.Type = secret.Type
 }
 
 func (s *SecretState) CombinedName() string {

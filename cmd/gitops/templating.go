@@ -7,7 +7,7 @@ import (
 )
 
 func testTemplating(c *cli.Context) error {
-	secretFiles, err := util.GetSecretFiles(c.String("root-dir"))
+	secretFiles, err := util.GetSecretFiles()
 	if err != nil {
 		log.Fatal(err)
 	}

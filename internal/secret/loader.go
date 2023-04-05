@@ -9,8 +9,8 @@ import (
 	Applies the specified target filter
 	Use SecretTargetAll to load all secrets
 */
-func LoadLocalSecrets(rootDirectory string, targetFilter SecretTarget) ([]*Secret, error) {
-	secretFileNames, err := util.GetSecretFiles(rootDirectory)
+func LoadLocalSecrets(targetFilter SecretTarget) ([]*Secret, error) {
+	secretFileNames, err := util.GetSecretFiles()
 	if err != nil {
 		return nil, err
 	}

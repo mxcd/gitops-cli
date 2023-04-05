@@ -1,13 +1,17 @@
 package secret
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"path"
+	"text/template"
 
 	"crypto/sha256"
 
+	"github.com/mxcd/gitops-cli/internal/templating"
 	"github.com/mxcd/gitops-cli/internal/util"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
 
@@ -53,6 +57,10 @@ type SecretFile struct {
 	ID         string            `yaml:"id,omitempty"`
 }
 
+type TemplateData struct {
+	Values map[interface{}]interface{}
+}
+
 func (s *Secret) Load() error {
 	if s.Path == "" {
 		return errors.New("secret path is empty")
@@ -64,13 +72,31 @@ func (s *Secret) Load() error {
 		return err
 	}
 
-	s.BinaryData = decryptedFileContent
-	binaryHash := sha256.Sum256(decryptedFileContent)
+	// execute templating on the secret file data
+	data := TemplateData{
+		Values: templating.GetValuesForPath(s.Path),
+	}
+	stringData := string(decryptedFileContent)
+	tmpl, err := template.New(s.Path).Parse(stringData)
+	if err != nil {
+		log.Error("Error parsing template for secret " + s.Path)
+		return err
+	}
+	buf := new(bytes.Buffer)
+	err = tmpl.Execute(buf, data)
+	if err != nil {
+		log.Error("Error executing template for secret " + s.Path)
+		return err
+	}
+
+	s.BinaryData = buf.Bytes()
+
+	binaryHash := sha256.Sum256(s.BinaryData)
 	hash := binaryHash[:]
 	s.BinaryDataHash = hex.EncodeToString(hash)
 
 	var secretFile SecretFile
-	yaml.UnmarshalStrict(decryptedFileContent, &secretFile)
+	yaml.UnmarshalStrict(s.BinaryData, &secretFile)
 
 	s.Target = secretFile.Target
 	

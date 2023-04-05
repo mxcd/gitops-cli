@@ -81,7 +81,7 @@ func createKubernetesPlan(c *cli.Context) (*plan.Plan, error) {
 		log.Error("Failed to connect to Kubernetes cluster")
 		return nil, err
 	}
-	localSecrets, err := secret.LoadLocalSecrets(c.String("root-dir"), secret.SecretTargetKubernetes)
+	localSecrets, err := secret.LoadLocalSecrets(secret.SecretTargetKubernetes)
 	if err != nil {
 		log.Error("Failed to load local secrets with target ", secret.SecretTargetKubernetes)
 		return nil, err
@@ -147,6 +147,7 @@ func createKubernetesPlan(c *cli.Context) (*plan.Plan, error) {
 		remoteSecret, err := k8s.GetSecret(&secret.Secret{
 			Name: stateSecret.Name,
 			Namespace: stateSecret.Namespace,
+			Type: stateSecret.Type,
 		})
 		if err != nil {
 			// only throw error if err is not "not found"
