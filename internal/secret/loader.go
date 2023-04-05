@@ -1,7 +1,10 @@
 package secret
 
 import (
+	"strings"
+
 	"github.com/mxcd/gitops-cli/internal/util"
+	log "github.com/sirupsen/logrus"
 )
 
 /*
@@ -16,6 +19,10 @@ func LoadLocalSecrets(targetFilter SecretTarget) ([]*Secret, error) {
 	}
 	secrets := []*Secret{}
 	for _, secretFileName := range secretFileNames {
+		if strings.HasSuffix(secretFileName, "values.gitops.secret.enc.yml") || strings.HasSuffix(secretFileName, "values.gitops.secret.enc.yaml")  {
+			log.Trace("Skipping values file: ", secretFileName)
+			continue
+		}
 		secret, err := FromPath(secretFileName)
 		if err != nil {
 			return nil, err

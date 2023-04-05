@@ -39,6 +39,16 @@ func main() {
 				Usage: "trace output",
 				EnvVars: []string{"GITOPS_VERY_VERBOSE"},
 			},
+			&cli.BoolFlag{
+				Name:  "cleartext",
+				Usage: "print secrets in cleartext to the console",
+				EnvVars: []string{"GITOPS_CLEARTEXT"},
+			},
+			&cli.BoolFlag{
+				Name:  "print",
+				Usage: "print secrets to the console",
+				EnvVars: []string{"GITOPS_PRINT"},
+			},
 		},
 		Commands: []*cli.Command{
 			{

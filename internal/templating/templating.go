@@ -24,6 +24,7 @@ type TemplateValuesPath struct {
 
 var loaded = false
 func LoadValues() error {
+	log.Trace("Loading values files")
 	secretFiles, err := util.GetSecretFiles()
 	if err != nil {
 		return err
@@ -36,6 +37,7 @@ func LoadValues() error {
 	}
 
 	for _, valuesFile := range valuesFiles {
+		log.Trace("Loading secret values file: ", valuesFile)
 		absoluteSecretPath := path.Join(util.GetRootDir(), valuesFile)
 		decryptedFileContent, err := util.DecryptFile(absoluteSecretPath)
 		if err != nil {
@@ -106,12 +108,21 @@ func GetValuesForPath(path string) map[interface{}]interface{} {
 		}
 	}
 	values := map[interface{}]interface{}{}
+	usedPath := ""
 	maxPathLength := 0
 	for _, templateValue := range templateValues {
 		if strings.HasPrefix(path, templateValue.Path) && len(templateValue.Path) > maxPathLength {
 			maxPathLength = len(templateValue.Path)
+			usedPath = templateValue.Path
 			values = templateValue.MergedValues
 		}
 	}
+
+	if usedPath != "" {
+		log.Tracef("Using values from %s for path %s", usedPath, path)
+	} else {
+		log.Tracef("No values found for path %s", path)
+	}
+
 	return values
 }

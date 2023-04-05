@@ -209,7 +209,7 @@ func (d *SecretDiff) Print() {
 		for _, entry := range d.Entries {
 			safeOldValue := entry.OldValue
 			safeNewValue := entry.NewValue
-			if entry.Sensitive {
+			if entry.Sensitive && !util.GetCliContext().Bool("cleartext") {
 				safeOldValue = util.ToRedactedString(entry.OldValue)
 				safeNewValue = util.ToRedactedString(entry.NewValue)
 			}

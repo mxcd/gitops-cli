@@ -120,12 +120,33 @@ func (s *Secret) Load() error {
 	}
 		
 	s.Data = secretFile.Data
+
+	if util.GetCliContext().Bool("print") {
+		s.PrettyPrint()
+	}
 	
 	return nil
 }
 
 func (s *Secret) CombinedName() string {
 	return s.Namespace + "/" + s.Name
+}
+
+func (s *Secret) PrettyPrint() {
+	cleartext := util.GetCliContext().Bool("cleartext")
+	println("---")
+	println(s.CombinedName())
+	println("  target: " + string(s.Target))
+	println("  type: " + s.Type)
+	println("  data:")
+	for k, v := range s.Data {
+		if cleartext {
+			println("    " + k + ":")
+			println(v)
+		} else {
+			println("    " + k + ": " + "********")
+		}
+	}
 }
 
 func FromPath(path string) (*Secret, error) {

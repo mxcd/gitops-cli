@@ -112,7 +112,7 @@ var cliContext *cli.Context
 func SetCliContext(c *cli.Context) {
 	cliContext = c
 }
-func getCliContext() *cli.Context {
+func GetCliContext() *cli.Context {
 	if cliContext == nil {
 		cliContext = GetDummyCliContext()
 	}
@@ -122,7 +122,7 @@ func getCliContext() *cli.Context {
 var _rootDir = ""
 func GetRootDir() string {
 	if _rootDir == "" {
-		ComputeRootDir(getCliContext())
+		ComputeRootDir(GetCliContext())
 	}
 	return _rootDir
 }
