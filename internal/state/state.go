@@ -10,6 +10,7 @@ import (
 	"github.com/mxcd/gitops-cli/internal/util"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v2"
+	"github.com/andybalholm/crlf"
 )
 
 type State struct {
@@ -56,7 +57,17 @@ func LoadState(c *cli.Context) error {
 	if stats.IsDir() {
 		return fmt.Errorf("state file is a directory")
 	}
-	yamlFile, err := ioutil.ReadFile(stateFileName)
+	stateFile, err := os.Open(stateFileName)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := stateFile.Close(); err != nil {
+			panic(err)
+		}
+	}()
+	reader := crlf.NewReader(stateFile)
+	yamlFile, err := ioutil.ReadAll(reader)
 	if err != nil {
 		return err
 	}
@@ -71,7 +82,19 @@ func (s *State) Save(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(stateFileName, yamlFile, 0644)
+	stateFile, err := os.Create(stateFileName)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := stateFile.Close(); err != nil {
+			panic(err)
+		}
+	}()
+	
+	writer := crlf.NewWriter(stateFile)
+	_, err = writer.Write(yamlFile)
+	return err
 }
 
 func (s *State) GetByPath(path string) *SecretState {

@@ -46,7 +46,7 @@ func LoadValues() error {
 		var values map[interface{}]interface{}
 		yaml.UnmarshalStrict(decryptedFileContent, &values)
 		templateValues = append(templateValues, &TemplateValuesPath{
-			Path:    fmt.Sprintf("%s/", filepath.Dir(valuesFile)),
+			Path:    fmt.Sprintf("%s/", filepath.ToSlash(filepath.Dir(valuesFile))),
 			Values:  values,
 		})
 	}

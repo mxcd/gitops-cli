@@ -44,13 +44,15 @@ func GetSecretFiles() ([]string, error) {
 			}
 
 			if secretFileRegex.MatchString(path) {
-				log.Debug("Found secret file: ", path)
+				log.Debug("Found secret file: ", path)				
 				relativePath, err := filepath.Rel(GetRootDir(), path)
 				if err != nil {
 					log.Error("An error occurred while getting the relative path of the secret file")
 					log.Error(err)
 					return err
 				}
+				relativePath = filepath.ToSlash(relativePath)
+				log.Trace("Converted path: ", relativePath)
 				secretFiles = append(secretFiles, relativePath)
 			}
 			return nil
