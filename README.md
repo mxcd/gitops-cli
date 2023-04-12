@@ -46,7 +46,7 @@ Or in short
 gitops s p k8s
 ```
 Example output:
-```bash
+```
 __             _ __
 \ \     ____ _(_) /_____  ____  _____
  \ \   / __ `/ / __/ __ \/ __ \/ ___/
@@ -85,7 +85,7 @@ gitops s a k8s
 ```
 The user will be prompted to confirm the changes before they are applied to the cluster. The prompt can be bypassed by using the `--auto-approve` flag.  
 Example output:
-```bash
+```
 __             _ __
 \ \     ____ _(_) /_____  ____  _____
  \ \   / __ `/ / __/ __ \/ __ \/ ___/
