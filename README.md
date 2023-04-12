@@ -13,6 +13,119 @@ __             _ __
 
 CLI tool for performing GitOps operations
 
+## Usage
+```
+NAME:
+   gitpos - GitOps CLI
+
+USAGE:
+   gitpos [global options] command [command options] [arguments...]
+
+COMMANDS:
+   secrets, s  GitOps managed secrets
+   help, h     Shows a list of commands or help for one command
+
+GLOBAL OPTIONS:
+   --root-dir value              root directory of the git repository [$GITOPS_ROOT_DIR]
+   --kubeconfig value, -k value  kubeconfig file to use for connecting to the Kubernetes cluster [$KUBECONFIG, $GITOPS_KUBECONFIG]
+   --verbose, -v                 debug output (default: false) [$GITOPS_VERBOSE]
+   --very-verbose, --vv          trace output (default: false) [$GITOPS_VERY_VERBOSE]
+   --cleartext                   print secrets in cleartext to the console (default: false) [$GITOPS_CLEARTEXT]
+   --print                       print secrets to the console (default: false) [$GITOPS_PRINT]
+   --help, -h                    show help
+```
+
+### Planning secret application to a cluster
+**NOTE:** It is expected, that the cluster's KUBECONFIG is already set up. Alternatively, the `--kubeconfig` flag can be used.
+
+```bash
+gitops secrets plan kubernetes
+```
+Or in short
+```bash
+gitops s p k8s
+```
+Example output:
+```bash
+__             _ __
+\ \     ____ _(_) /_____  ____  _____
+ \ \   / __ `/ / __/ __ \/ __ \/ ___/
+ / /  / /_/ / / /_/ /_/ / /_/ (__  )
+/_/   \__, /_/\__/\____/ .___/____/
+     /____/           /_/
+
+GitOps CLI computed the following changes for your cluster:
+-------------------------------------------------------
+
+default/my-config-map :  add
+  + data.loremIpsum: **************************************************
+  + data.someConfigMapKey: **************
+---
+default/implicit-name :  unchanged
+---
+default/my-secret-name :  unchanged
+---
+default/database-credentials :  change
+  ~ data.bar: ** => **
+
+-------------------------------------------------------
+
+use gitops secrets apply kubernetes to apply these changes to your cluster
+```
+
+### Applying secrets to a cluster
+**NOTE:** It is expected, that the cluster's KUBECONFIG is already set up. Alternatively, the `--kubeconfig` flag can be used.
+
+```bash
+gitops secrets apply kubernetes
+```
+Or in short
+```bash
+gitops s a k8s
+```
+The user will be prompted to confirm the changes before they are applied to the cluster. The prompt can be bypassed by using the `--auto-approve` flag.  
+Example output:
+```bash
+__             _ __
+\ \     ____ _(_) /_____  ____  _____
+ \ \   / __ `/ / __/ __ \/ __ \/ ___/
+ / /  / /_/ / / /_/ /_/ / /_/ (__  )
+/_/   \__, /_/\__/\____/ .___/____/
+     /____/           /_/
+
+GitOps CLI computed the following changes for your cluster:
+-------------------------------------------------------
+
+default/my-config-map :  add
+  + data.someConfigMapKey: **************
+  + data.loremIpsum: **************************************************
+---
+default/implicit-name :  unchanged
+---
+default/my-secret-name :  unchanged
+---
+default/database-credentials :  change
+  ~ data.bar: ** => *****
+
+-------------------------------------------------------
+
+GitOps CLI will apply these changes to your Kubernetes cluster.
+Only 'yes' will be accepted to approve.
+Apply changes above: yes
+GitOps CLI will now execute the changes for your cluster:
+-------------------------------------------------------
+
+default / my-config-map  created
+default / database-credentials  updated
+
+-------------------------------------------------------
+
+All changes applied.
+```
+
+Redacted secrets (`*********`) can be displayed in cleartext by using the `--cleartext` flag.  
+To print all loaded secrets to the console, use the `--print` flag.
+
 ## Installation
 
 ### MacOS
@@ -53,19 +166,23 @@ Make sure to follow a strict naming convention for your secret files, in order t
 
 The secrets files must follow the following format:
 
-Case 1: Secret for Vault
-
 ```yaml
 # target of the secret
-target: vault
-# name of the secret - will be used as path in vault
-name: /my/secret/name
+target: < k8s | vault >
+# name of the secret
+name: <my-secret-name>
+# optional namespace of the secret (default: default)
+namespace: <my-namespace>
+# type of the secret (default: Opaque)
+# only for k8s secrets: ConfigMap or any of the following: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
+type: < ConfigMap | Opaque | ... >
 # data of the secret as kv pairs
 data:
-  key: value
+  <key1>: <value1>
+  <key2>: <value2>
 ```
 
-Case 2: Secret for K8s
+##### Case 1: Secret for K8s
 
 ```yaml
 # target of the secret
@@ -81,7 +198,6 @@ data:
   key: value
 ```
 
-To ensure intercompatibility with K8s and vault, the following rules apply:
 If the name is not given in the file, the name will be inferred from the filename. The file extension `.gitops.secret.enc.y[a]ml` will be removed.
 
 ```yaml
@@ -91,6 +207,21 @@ name: my-secret-name
 ```
 
 This implies, that the filename must be a valid K8s secret name.
+
+
+##### Case 2: Secret for Vault
+**NOTE:** Vault secrets are still WIP
+
+```yaml
+# target of the secret
+target: vault
+# name of the secret - will be used as path in vault
+name: /my/secret/name
+# data of the secret as kv pairs
+data:
+  key: value
+```
+
 
 #### Secrets Templating
 
