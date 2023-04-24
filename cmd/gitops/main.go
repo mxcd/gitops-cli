@@ -4,6 +4,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/TwiN/go-color"
+	"github.com/mxcd/gitops-cli/internal/state"
+	"github.com/mxcd/gitops-cli/internal/util"
 	"github.com/schollz/progressbar/v3"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -109,6 +112,76 @@ func main() {
 						Action: func(c *cli.Context) error {
 							initApplication(c)
 							return testTemplating(c)
+						},
+					},
+				},
+			},
+			{
+				Name: "clusters",
+				Usage: "Managing target clusters",
+				Subcommands: []*cli.Command{
+					{
+						Name: "list",
+						Usage: "List all target clusters",
+						Action: func(c *cli.Context) error {
+							initApplication(c)
+							clusters := state.GetState().GetClusters()
+							if len(clusters) == 0 {
+								println("No clusters configured")
+								return nil
+							}
+							for _, cluster := range clusters {
+								println(color.InBlue(cluster.Name), " => ", cluster.ConfigFile)
+							}
+							return exitApplication(c, true)
+						},
+					},
+					{
+						Name: "add",
+						Usage: "Add a target cluster. <name> <configFile>",
+						Action: func(c *cli.Context) error {
+							initApplication(c)
+							kubeconfig := ""
+							if c.Args().Len() == 1 {
+								println("Please enter location of kubeconfig file for new ", color.InBlue(c.Args().Get(0)), " cluster: ")
+								kubeconfig = util.StringPrompt("kubeconfig file: ")
+							} else if c.Args().Len() == 2 {
+								kubeconfig = c.Args().Get(1)
+							} else {
+								log.Fatal("Usage: gitops clusters add <name> <configFile>")
+							}
+							err := state.GetState().AddCluster(&state.ClusterState{
+								Name: c.Args().Get(0),
+								ConfigFile: kubeconfig,
+							})
+							if err != nil {
+								return err
+							}
+							return exitApplication(c, true)
+						},
+					},
+					{
+						Name: "remove",
+						Usage: "Remove a target cluster",
+						Action: func(c *cli.Context) error {
+							initApplication(c)
+							if c.Args().Len() != 1 {
+								log.Fatal("Usage: gitops clusters remove <name>")
+							}
+							err := state.GetState().RemoveCluster(c.Args().Get(0))
+							if err != nil {
+								return err
+							}
+							return exitApplication(c, true)
+						},
+					},
+					{
+						Name: "test",
+						Usage: "Test a target cluster connection",
+						Action: func(c *cli.Context) error {
+							initApplication(c)
+							
+							return nil
 						},
 					},
 				},

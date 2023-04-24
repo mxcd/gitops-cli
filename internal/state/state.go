@@ -6,16 +6,20 @@ import (
 	"os"
 	"path"
 
+	"github.com/TwiN/go-color"
+	"github.com/andybalholm/crlf"
 	"github.com/mxcd/gitops-cli/internal/secret"
 	"github.com/mxcd/gitops-cli/internal/util"
+	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v2"
-	"github.com/andybalholm/crlf"
 )
 
 type State struct {
 	// List of secrets in the state
 	Secrets []*SecretState
+	// Map of clusters known to the state
+	Clusters map[string]*ClusterState
 }
 
 type SecretState struct {
@@ -35,6 +39,13 @@ type SecretState struct {
 	BinaryDataHash string
 }
 
+type ClusterState struct {
+	// Name of the cluster
+	Name string
+	// Kubeconfig file of the cluster
+	ConfigFile string
+}
+
 var state *State
 
 func LoadState(c *cli.Context) error {
@@ -46,6 +57,7 @@ func LoadState(c *cli.Context) error {
 			// Create new state
 			state = &State{
 				Secrets: []*SecretState{},
+				Clusters: map[string]*ClusterState{},
 			}
 			return nil
 		} else {
@@ -140,4 +152,52 @@ func (s *State) SetSecrets(secrets []*SecretState) {
 
 func GetState() *State {
 	return state
+}
+
+type ClusterExistsError struct{}
+func (m *ClusterExistsError) Error() string {
+	return "Cluster already exists"
+}
+
+type ClusterNotFoundError struct{}
+func (m *ClusterNotFoundError) Error() string {
+	return "Cluster could not be found"
+}
+
+func (s *State) GetCluster(name string) (*ClusterState, error) {
+	if s.Clusters[name] == nil {
+		log.Error("Cluster " + color.InBlue(name) + " not defined in state")
+		return nil, &ClusterNotFoundError{}
+	}
+	return s.Clusters[name], nil
+}
+
+func (s *State) AddCluster(cluster *ClusterState) error {
+	if s.Clusters == nil {
+		s.Clusters = map[string]*ClusterState{}
+	}
+	if s.Clusters[cluster.Name] != nil {
+		log.Error("Cluster " + color.InBlue(cluster.Name) + " already defined in state")
+		return &ClusterExistsError{}
+	}
+	s.Clusters[cluster.Name] = cluster
+	println(color.InGreen("Added cluster "), color.InBlue(cluster.Name))
+	return nil
+}
+
+func (s *State) GetClusters() map[string]*ClusterState {
+	if s.Clusters == nil {
+		s.Clusters = map[string]*ClusterState{}
+	}
+	return s.Clusters
+}
+
+func (s *State) RemoveCluster(name string) error {
+	if s.Clusters[name] == nil {
+		log.Error("Cluster " + color.InBlue(name) + " not defined in state")
+		return &ClusterNotFoundError{}
+	}
+	delete(s.Clusters, name)
+	println(color.InRed("Removed cluster "), color.InBlue(name))
+	return nil
 }
