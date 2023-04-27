@@ -26,7 +26,9 @@ type SecretState struct {
 	// unique uuid of the secret
 	ID string
 	// Target is the target of the secret
-	Target secret.SecretTarget
+	TargetType secret.SecretTargetType
+	// Target is the target system (cluster of vault instance)
+	Target string
 	// Name of the secret
 	Name string
 	// Namespace of the secret
@@ -121,6 +123,7 @@ func (s *State) GetByPath(path string) *SecretState {
 func (s *State) Add(secret *secret.Secret) *SecretState {
 	stateSecret := &SecretState{
 		ID: secret.ID,
+		TargetType: secret.TargetType,
 		Target: secret.Target,
 		Path: secret.Path,
 		BinaryDataHash: secret.BinaryDataHash,
@@ -135,6 +138,7 @@ func (s *State) Add(secret *secret.Secret) *SecretState {
 // TODO prohibit update of the secret type
 func (s *SecretState) Update(secret *secret.Secret) {
 	secret.ID = s.ID
+	s.TargetType = secret.TargetType
 	s.Target = secret.Target
 	s.Name = secret.Name
 	s.Namespace = secret.Namespace
@@ -164,6 +168,11 @@ func (m *ClusterNotFoundError) Error() string {
 	return "Cluster could not be found"
 }
 
+type ClusterNameReservedError struct{}
+func (m *ClusterNameReservedError) Error() string {
+	return "The given cluster name is reserved"
+}
+
 func (s *State) GetCluster(name string) (*ClusterState, error) {
 	if s.Clusters[name] == nil {
 		log.Error("Cluster " + color.InBlue(name) + " not defined in state")
@@ -173,6 +182,10 @@ func (s *State) GetCluster(name string) (*ClusterState, error) {
 }
 
 func (s *State) AddCluster(cluster *ClusterState) error {
+	if cluster.Name == string(util.DefaultClusterClient) {
+		log.Error("Cluster name " + color.InBlue(cluster.Name) + " is reserved")
+		return &ClusterNameReservedError{}
+	}
 	if s.Clusters == nil {
 		s.Clusters = map[string]*ClusterState{}
 	}

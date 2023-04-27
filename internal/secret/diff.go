@@ -90,6 +90,15 @@ func CompareSecrets(oldSecret *Secret, newSecret *Secret) *SecretDiff {
 		}
 	}
 	
+	if oldSecret.TargetType != newSecret.TargetType {
+		diffEntries = append(diffEntries, SecretDiffEntry{
+			Type: SecretDiffTypeChanged,
+			Key: "targetType",
+			OldValue: string(oldSecret.TargetType),
+			NewValue: string(newSecret.TargetType),
+			Sensitive: false,
+		})
+	}
 
 	if oldSecret.Target != newSecret.Target {
 		diffEntries = append(diffEntries, SecretDiffEntry{

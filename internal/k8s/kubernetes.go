@@ -2,71 +2,30 @@ package k8s
 
 import (
 	"context"
-	"os"
 
 	"github.com/TwiN/go-color"
 	"github.com/mxcd/gitops-cli/internal/secret"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
-var clientset *kubernetes.Clientset
-
-func InitKubernetesClient(c *cli.Context) error {
-	kubeconfig := c.String("kubeconfig")
-	if kubeconfig == "" {
-		log.Trace("No KUBECONFIG given. Testing default locations")
-		// check if file exists
-		_, err := os.Stat(clientcmd.RecommendedHomeFile)
-		if os.IsNotExist(err) {
-			log.Trace("No KUBECONFIG found in default locations. Attempting in-cluster config")
-		} else if err == nil {
-			log.Trace("Found KUBECONFIG in default location: ", clientcmd.RecommendedHomeFile)
-			kubeconfig = clientcmd.RecommendedHomeFile
-		}
-	}
-
-	log.Trace("Building Kubernetes client config from KUBECONFIG: ", kubeconfig)
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
-	if err != nil {
-		return err
-	}
-
-	log.Trace("Creating Kubernetes clientset")
-	clientset, err = kubernetes.NewForConfig(config)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func TestClusterConnection() (bool, error) {
-	log.Trace("Testing Kubernetes cluster connection")
-	serverVersion, err := clientset.Discovery().ServerVersion()
-	if err != nil {
-		log.Error("Failed to connect to Kubernetes cluster: ", err)
-		return false, err
-	}
-	log.Debug("Connected to Kubernetes cluster: ", serverVersion)
-
-	return true, nil
-}
-
-func CreateSecret(s *secret.Secret) error {
+func CreateSecret(s *secret.Secret, clusterName string) error {
 	if s.Type == "ConfigMap" {
-		return CreateK8sConfigMap(s)
+		return CreateK8sConfigMap(s, clusterName)
 	} else {
-		return CreateK8sSecret(s)
+		return CreateK8sSecret(s, clusterName)
 	}
 }
 
-func CreateK8sConfigMap(s *secret.Secret) error {
+func CreateK8sConfigMap(s *secret.Secret, clusterName string) error {
+	clusterClient, err := GetClient(clusterName)
+	if err != nil {
+		return err
+	}
+	clientset := clusterClient.Clientset
+
 	log.Trace("Creating ConfigMap ", s.Name, " in namespace ", s.Namespace)
 	k8sConfigMap, err := clientset.CoreV1().ConfigMaps(s.Namespace).Create(context.Background(), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -86,7 +45,13 @@ func CreateK8sConfigMap(s *secret.Secret) error {
 	return err
 }
 
-func CreateK8sSecret(s *secret.Secret) error {
+func CreateK8sSecret(s *secret.Secret, clusterName string) error {
+	clusterClient, err := GetClient(clusterName)
+	if err != nil {
+		return err
+	}
+	clientset := clusterClient.Clientset
+
 	log.Trace("Creating Secret ", s.Name, " in namespace ", s.Namespace)
 	k8sSecret, err := clientset.CoreV1().Secrets(s.Namespace).Create(context.Background(), &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -107,17 +72,22 @@ func CreateK8sSecret(s *secret.Secret) error {
 	return err
 }
 
-func UpdateSecret(s *secret.Secret) error {
+func UpdateSecret(s *secret.Secret, clusterName string) error {
 	if s.Type == "ConfigMap" {
-		return UpdateK8sConfigMap(s)
+		return UpdateK8sConfigMap(s, clusterName)
 	} else {
-		return UpdateK8sSecret(s)
+		return UpdateK8sSecret(s, clusterName)
 	}
 }
 
-func UpdateK8sSecret(s *secret.Secret) error {
-	log.Trace("Updating Secret ", s.Name, " in namespace ", s.Namespace)
+func UpdateK8sSecret(s *secret.Secret, clusterName string) error {
+	clusterClient, err := GetClient(clusterName)
+	if err != nil {
+		return err
+	}
+	clientset := clusterClient.Clientset
 
+	log.Trace("Updating Secret ", s.Name, " in namespace ", s.Namespace)
 	k8sSecret, err := clientset.CoreV1().Secrets(s.Namespace).Update(context.Background(), &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: s.Name,
@@ -137,7 +107,12 @@ func UpdateK8sSecret(s *secret.Secret) error {
 	return err
 }
 
-func UpdateK8sConfigMap(s *secret.Secret) error {
+func UpdateK8sConfigMap(s *secret.Secret, clusterName string) error {
+	clusterClient, err := GetClient(clusterName)
+	if err != nil {
+		return err
+	}
+	clientset := clusterClient.Clientset
 	log.Trace("Updating ConfigMap ", s.Name, " in namespace ", s.Namespace)
 
 	k8sConfigMap, err := clientset.CoreV1().ConfigMaps(s.Namespace).Update(context.Background(), &v1.ConfigMap{
@@ -158,17 +133,22 @@ func UpdateK8sConfigMap(s *secret.Secret) error {
 	return err
 }
 
-func DeleteSecret(s *secret.Secret) error {
+func DeleteSecret(s *secret.Secret, clusterName string) error {
 	if s.Type == "ConfigMap" {
-		return DeleteK8sConfigMap(s)
+		return DeleteK8sConfigMap(s, clusterName)
 	} else {
-		return DeleteK8sSecret(s)
+		return DeleteK8sSecret(s, clusterName)
 	}
 }
 
-func DeleteK8sConfigMap(s *secret.Secret) error {
+func DeleteK8sConfigMap(s *secret.Secret, clusterName string) error {
+	clusterClient, err := GetClient(clusterName)
+	if err != nil {
+		return err
+	}
+	clientset := clusterClient.Clientset
 	log.Trace("Deleting ConfigMap ", s.Name, " in namespace ", s.Namespace)
-	err := clientset.CoreV1().ConfigMaps(s.Namespace).Delete(context.Background(), s.Name, metav1.DeleteOptions{})
+	err = clientset.CoreV1().ConfigMaps(s.Namespace).Delete(context.Background(), s.Name, metav1.DeleteOptions{})
 	if err != nil {
 		return err
 	}
@@ -176,9 +156,14 @@ func DeleteK8sConfigMap(s *secret.Secret) error {
 	return err
 }
 
-func DeleteK8sSecret(s *secret.Secret) error {
+func DeleteK8sSecret(s *secret.Secret, clusterName string) error {
+	clusterClient, err := GetClient(clusterName)
+	if err != nil {
+		return err
+	}
+	clientset := clusterClient.Clientset
 	log.Trace("Deleting Secret ", s.Name, " in namespace ", s.Namespace)
-	err := clientset.CoreV1().Secrets(s.Namespace).Delete(context.Background(), s.Name, metav1.DeleteOptions{})
+	err = clientset.CoreV1().Secrets(s.Namespace).Delete(context.Background(), s.Name, metav1.DeleteOptions{})
 	if err != nil {
 		return err
 	}
@@ -186,15 +171,20 @@ func DeleteK8sSecret(s *secret.Secret) error {
 	return err
 }
 
-func GetSecret(s *secret.Secret) (*secret.Secret, error) {
+func GetSecret(s *secret.Secret, clusterName string) (*secret.Secret, error) {
 	if s.Type == "ConfigMap" {
-		return GetK8sConfigMap(s)
+		return GetK8sConfigMap(s, clusterName)
 	} else {
-		return GetK8sSecret(s)
+		return GetK8sSecret(s, clusterName)
 	}
 }
 
-func GetK8sConfigMap(s *secret.Secret) (*secret.Secret, error) {
+func GetK8sConfigMap(s *secret.Secret, clusterName string) (*secret.Secret, error) {
+	clusterClient, err := GetClient(clusterName)
+	if err != nil {
+		return nil, err
+	}
+	clientset := clusterClient.Clientset
 	k8sConfigMap, err := clientset.CoreV1().ConfigMaps(s.Namespace).Get(context.Background(), s.Name, metav1.GetOptions{})
 	
 	if err != nil {
@@ -203,14 +193,20 @@ func GetK8sConfigMap(s *secret.Secret) (*secret.Secret, error) {
 
 	return &secret.Secret{
 		Name: k8sConfigMap.Name,
-		Target: secret.SecretTargetKubernetes,
+		TargetType: secret.SecretTargetTypeKubernetes,
+		Target: clusterName,
 		Namespace: k8sConfigMap.Namespace,
 		Data: k8sConfigMap.Data,
 		Type: "ConfigMap",
 	}, nil
 }
 
-func GetK8sSecret(s *secret.Secret) (*secret.Secret, error) {
+func GetK8sSecret(s *secret.Secret, clusterName string) (*secret.Secret, error) {
+	clusterClient, err := GetClient(clusterName)
+	if err != nil {
+		return nil, err
+	}
+	clientset := clusterClient.Clientset
 	k8sSecret, err := clientset.CoreV1().Secrets(s.Namespace).Get(context.Background(), s.Name, metav1.GetOptions{})
 	
 	if err != nil {
@@ -219,7 +215,8 @@ func GetK8sSecret(s *secret.Secret) (*secret.Secret, error) {
 
 	return &secret.Secret{
 		Name: k8sSecret.Name,
-		Target: secret.SecretTargetKubernetes,
+		TargetType: secret.SecretTargetTypeKubernetes,
+		Target: clusterName,
 		Namespace: k8sSecret.Namespace,
 		Data: getStringData(k8sSecret),
 		Type: string(k8sSecret.Type),

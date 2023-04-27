@@ -2,12 +2,11 @@ package main
 
 import (
 	"os"
-	"time"
 
 	"github.com/TwiN/go-color"
+	"github.com/mxcd/gitops-cli/internal/k8s"
 	"github.com/mxcd/gitops-cli/internal/state"
 	"github.com/mxcd/gitops-cli/internal/util"
-	"github.com/schollz/progressbar/v3"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
@@ -58,6 +57,15 @@ func main() {
 				Name: "secrets",
 				Aliases: []string{"s"},
 				Usage: "GitOps managed secrets",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name: "dir",
+						Aliases: []string{"d"},
+						Value: "",
+						Usage: "directory to limit secret discovery to",
+						EnvVars: []string{"GITOPS_SECRETS_DIR"},
+					},
+				},
 				Subcommands: []*cli.Command{
 					{
 						Name: "apply",
@@ -180,8 +188,12 @@ func main() {
 						Usage: "Test a target cluster connection",
 						Action: func(c *cli.Context) error {
 							initApplication(c)
-							
-							return nil
+							k8s.InitClusterClients(c)
+							clusterClients := k8s.GetClients()
+							for _, clusterClient := range clusterClients {
+								clusterClient.PrettyPrint()
+							}
+							return exitApplication(c, false)
 						},
 					},
 				},
@@ -194,23 +206,3 @@ func main() {
 		log.Fatal(err)
 	}
 }
-
-func barTest() {
-	bar := progressbar.NewOptions(100,
-		progressbar.OptionEnableColorCodes(true),
-		progressbar.OptionShowBytes(false),
-		progressbar.OptionSetWidth(30),
-		progressbar.OptionSetDescription("[cyan][1/3][reset] Writing moshable file..."),
-		/*progressbar.OptionSetTheme(progressbar.Theme{
-			Saucer:        "[green]=[reset]",
-			SaucerHead:    "[green]>[reset]",
-			SaucerPadding: " ",
-			BarStart:      "[",
-			BarEnd:        "]",
-	})*/)
-	for i := 0; i < 100; i++ {
-		bar.Add(1)
-		time.Sleep(40 * time.Millisecond)
-	}
-}
-

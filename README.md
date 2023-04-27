@@ -14,6 +14,7 @@ __             _ __
 CLI tool for performing GitOps operations
 
 ## Usage
+
 ```
 NAME:
    gitpos - GitOps CLI
@@ -36,16 +37,21 @@ GLOBAL OPTIONS:
 ```
 
 ### Planning secret application to a cluster
+
 **NOTE:** It is expected, that the cluster's KUBECONFIG is already set up. Alternatively, the `--kubeconfig` flag can be used.
 
 ```bash
 gitops secrets plan kubernetes
 ```
+
 Or in short
+
 ```bash
 gitops s p k8s
 ```
+
 Example output:
+
 ```
 __             _ __
 \ \     ____ _(_) /_____  ____  _____
@@ -74,17 +80,22 @@ use gitops secrets apply kubernetes to apply these changes to your cluster
 ```
 
 ### Applying secrets to a cluster
+
 **NOTE:** It is expected, that the cluster's KUBECONFIG is already set up. Alternatively, the `--kubeconfig` flag can be used.
 
 ```bash
 gitops secrets apply kubernetes
 ```
+
 Or in short
+
 ```bash
 gitops s a k8s
 ```
+
 The user will be prompted to confirm the changes before they are applied to the cluster. The prompt can be bypassed by using the `--auto-approve` flag.  
 Example output:
+
 ```
 __             _ __
 \ \     ____ _(_) /_____  ____  _____
@@ -168,7 +179,8 @@ The secrets files must follow the following format:
 
 ```yaml
 # target of the secret
-target: < k8s | vault >
+targetType: < k8s | vault >
+
 # name of the secret
 name: <my-secret-name>
 # optional namespace of the secret (default: default)
@@ -185,8 +197,8 @@ data:
 ##### Case 1: Secret for K8s
 
 ```yaml
-# target of the secret
-target: k8s
+# targetType of the secret
+targetType: k8s
 # name of the secret
 name: my-secret-name
 # optional namespace of the secret (default: default)
@@ -208,20 +220,19 @@ name: my-secret-name
 
 This implies, that the filename must be a valid K8s secret name.
 
-
 ##### Case 2: Secret for Vault
+
 **NOTE:** Vault secrets are still WIP
 
 ```yaml
 # target of the secret
-target: vault
+targetType: vault
 # name of the secret - will be used as path in vault
 name: /my/secret/name
 # data of the secret as kv pairs
 data:
   key: value
 ```
-
 
 #### Secrets Templating
 
