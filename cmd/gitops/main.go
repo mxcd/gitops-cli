@@ -2,9 +2,11 @@ package main
 
 import (
 	"os"
-	"time"
 
-	"github.com/schollz/progressbar/v3"
+	"github.com/TwiN/go-color"
+	"github.com/mxcd/gitops-cli/internal/k8s"
+	"github.com/mxcd/gitops-cli/internal/state"
+	"github.com/mxcd/gitops-cli/internal/util"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
@@ -55,6 +57,15 @@ func main() {
 				Name: "secrets",
 				Aliases: []string{"s"},
 				Usage: "GitOps managed secrets",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name: "dir",
+						Aliases: []string{"d"},
+						Value: "",
+						Usage: "directory to limit secret discovery to",
+						EnvVars: []string{"GITOPS_SECRETS_DIR"},
+					},
+				},
 				Subcommands: []*cli.Command{
 					{
 						Name: "apply",
@@ -113,6 +124,80 @@ func main() {
 					},
 				},
 			},
+			{
+				Name: "clusters",
+				Usage: "Managing target clusters",
+				Subcommands: []*cli.Command{
+					{
+						Name: "list",
+						Usage: "List all target clusters",
+						Action: func(c *cli.Context) error {
+							initApplication(c)
+							clusters := state.GetState().GetClusters()
+							if len(clusters) == 0 {
+								println("No clusters configured")
+								return nil
+							}
+							for _, cluster := range clusters {
+								println(color.InBlue(cluster.Name), " => ", cluster.ConfigFile)
+							}
+							return exitApplication(c, true)
+						},
+					},
+					{
+						Name: "add",
+						Usage: "Add a target cluster. <name> <configFile>",
+						Action: func(c *cli.Context) error {
+							initApplication(c)
+							kubeconfig := ""
+							if c.Args().Len() == 1 {
+								println("Please enter location of kubeconfig file for new ", color.InBlue(c.Args().Get(0)), " cluster: ")
+								kubeconfig = util.StringPrompt("kubeconfig file: ")
+							} else if c.Args().Len() == 2 {
+								kubeconfig = c.Args().Get(1)
+							} else {
+								log.Fatal("Usage: gitops clusters add <name> <configFile>")
+							}
+							err := state.GetState().AddCluster(&state.ClusterState{
+								Name: c.Args().Get(0),
+								ConfigFile: kubeconfig,
+							})
+							if err != nil {
+								return err
+							}
+							return exitApplication(c, true)
+						},
+					},
+					{
+						Name: "remove",
+						Usage: "Remove a target cluster",
+						Action: func(c *cli.Context) error {
+							initApplication(c)
+							if c.Args().Len() != 1 {
+								log.Fatal("Usage: gitops clusters remove <name>")
+							}
+							err := state.GetState().RemoveCluster(c.Args().Get(0))
+							if err != nil {
+								return err
+							}
+							return exitApplication(c, true)
+						},
+					},
+					{
+						Name: "test",
+						Usage: "Test a target cluster connection",
+						Action: func(c *cli.Context) error {
+							initApplication(c)
+							k8s.InitClusterClients(c)
+							clusterClients := k8s.GetClients()
+							for _, clusterClient := range clusterClients {
+								clusterClient.PrettyPrint()
+							}
+							return exitApplication(c, false)
+						},
+					},
+				},
+			},
 		},
 	}
 
@@ -121,23 +206,3 @@ func main() {
 		log.Fatal(err)
 	}
 }
-
-func barTest() {
-	bar := progressbar.NewOptions(100,
-		progressbar.OptionEnableColorCodes(true),
-		progressbar.OptionShowBytes(false),
-		progressbar.OptionSetWidth(30),
-		progressbar.OptionSetDescription("[cyan][1/3][reset] Writing moshable file..."),
-		/*progressbar.OptionSetTheme(progressbar.Theme{
-			Saucer:        "[green]=[reset]",
-			SaucerHead:    "[green]>[reset]",
-			SaucerPadding: " ",
-			BarStart:      "[",
-			BarEnd:        "]",
-	})*/)
-	for i := 0; i < 100; i++ {
-		bar.Add(1)
-		time.Sleep(40 * time.Millisecond)
-	}
-}
-

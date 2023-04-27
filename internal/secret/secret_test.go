@@ -18,10 +18,10 @@ func TestLoadSecret1(t *testing.T) {
 		t.Error(err)
 	}
 
-	assert.Equal(t, secret.Target, SecretTargetVault, "Target should be vault")
-	assert.Equal(t, secret.Name, "my-explicitly-named-secret", "Name should be my-explicitly-named-secret")
-	assert.Equal(t, secret.Namespace, "default", "Namespace should be default")
-	assert.Equal(t, secret.Type, "Opaque", "Type should be Opaque")
+	assert.Equal(t, SecretTargetTypeVault, secret.TargetType, "Target should be vault")
+	assert.Equal(t, "my-explicitly-named-secret", secret.Name, "Name should be my-explicitly-named-secret")
+	assert.Equal(t, "default", secret.Namespace, "Namespace should be default")
+	assert.Equal(t, "Opaque", secret.Type, "Type should be Opaque")
 
 	t.Log(secret)
 }
@@ -37,7 +37,7 @@ func TestLoadSecret2(t *testing.T) {
 		t.Error(err)
 	}
 
-	assert.Equal(t, SecretTargetKubernetes, secret.Target, "Target should be k8s")
+	assert.Equal(t, SecretTargetTypeKubernetes, secret.TargetType, "Target should be k8s")
 	assert.Equal(t, "implicit-name", secret.Name, "Name should be implicit-name")
 	assert.Equal(t, "default", secret.Namespace, "Namespace should be default")
 	assert.Equal(t, "kubernetes.io/dockerconfigjson", secret.Type, "Type should be dockerconfigjson")
@@ -48,7 +48,7 @@ func TestSecretComparisonTarget(t *testing.T) {
 		Name: "myName",
 		Namespace: "myNamespace",
 		Type: "Opaque",
-		Target: SecretTargetKubernetes,
+		TargetType: SecretTargetTypeKubernetes,
 		Data: map[string]string {},
 	}
 
@@ -56,7 +56,7 @@ func TestSecretComparisonTarget(t *testing.T) {
 		Name: "myName",
 		Namespace: "myNamespace",
 		Type: "Opaque",
-		Target: SecretTargetVault,
+		TargetType: SecretTargetTypeVault,
 		Data: map[string]string {},
 	}
 
@@ -65,8 +65,8 @@ func TestSecretComparisonTarget(t *testing.T) {
 	assert.Equal(t, false, diff.Equal, "Secrets should not be equal")
 	assert.Equal(t, SecretDiffTypeChanged, diff.Type, "Diff type should be changed")
 	assert.Equal(t, 1, len(diff.Entries), "Diff should have 1 entry")
-	entry := diff.GetEntry("target")
-	assert.NotNil(t, entry, "Diff should have an entry for target")
+	entry := diff.GetEntry("targetType")
+	assert.NotNil(t, entry, "Diff should have an entry for targetType")
 	assert.Equal(t, SecretDiffTypeChanged, entry.Type, "DiffEntry type should be changed")
 }
 
@@ -75,7 +75,7 @@ func TestSecretComparisonType(t *testing.T) {
 		Name: "myName",
 		Namespace: "myNamespace",
 		Type: "Opaque",
-		Target: SecretTargetKubernetes,
+		TargetType: SecretTargetTypeKubernetes,
 		Data: map[string]string {},
 	}
 
@@ -83,7 +83,7 @@ func TestSecretComparisonType(t *testing.T) {
 		Name: "myName",
 		Namespace: "myNamespace",
 		Type: ".dockerconfigjson",
-		Target: SecretTargetKubernetes,
+		TargetType: SecretTargetTypeKubernetes,
 		Data: map[string]string {},
 	}
 
@@ -102,7 +102,7 @@ func TestSecretComparisonChangedName(t *testing.T) {
 		Name: "myName",
 		Namespace: "myNamespace",
 		Type: "Opaque",
-		Target: SecretTargetKubernetes,
+		TargetType: SecretTargetTypeKubernetes,
 		Data: map[string]string {},
 	}
 
@@ -110,7 +110,7 @@ func TestSecretComparisonChangedName(t *testing.T) {
 		Name: "myNameExtended",
 		Namespace: "myNamespace",
 		Type: "Opaque",
-		Target: SecretTargetKubernetes,
+		TargetType: SecretTargetTypeKubernetes,
 		Data: map[string]string {},
 	}
 
@@ -130,7 +130,7 @@ func TestSecretComparisonChangedNamespace(t *testing.T) {
 		Name: "myName",
 		Namespace: "myNamespace",
 		Type: "Opaque",
-		Target: SecretTargetKubernetes,
+		TargetType: SecretTargetTypeKubernetes,
 		Data: map[string]string {},
 	}
 
@@ -138,7 +138,7 @@ func TestSecretComparisonChangedNamespace(t *testing.T) {
 		Name: "myName",
 		Namespace: "myNamespaceExtended",
 		Type: "Opaque",
-		Target: SecretTargetKubernetes,
+		TargetType: SecretTargetTypeKubernetes,
 		Data: map[string]string {},
 	}
 
@@ -158,7 +158,7 @@ func TestSecretComparisonAddData(t *testing.T) {
 		Name: "myName",
 		Namespace: "myNamespace",
 		Type: "Opaque",
-		Target: SecretTargetKubernetes,
+		TargetType: SecretTargetTypeKubernetes,
 		Data: map[string]string {},
 	}
 
@@ -166,7 +166,7 @@ func TestSecretComparisonAddData(t *testing.T) {
 		Name: "myName",
 		Namespace: "myNamespace",
 		Type: "Opaque",
-		Target: SecretTargetKubernetes,
+		TargetType: SecretTargetTypeKubernetes,
 		Data: map[string]string {
 			"key1": "value1",
 			"key2": "value2",
@@ -193,7 +193,7 @@ func TestSecretComparisonRemoveData(t *testing.T) {
 		Name: "myName",
 		Namespace: "myNamespace",
 		Type: "Opaque",
-		Target: SecretTargetKubernetes,
+		TargetType: SecretTargetTypeKubernetes,
 		Data: map[string]string {
 			"key1": "value1",
 			"key2": "value2",
@@ -204,7 +204,7 @@ func TestSecretComparisonRemoveData(t *testing.T) {
 		Name: "myName",
 		Namespace: "myNamespace",
 		Type: "Opaque",
-		Target: SecretTargetKubernetes,
+		TargetType: SecretTargetTypeKubernetes,
 		Data: map[string]string {},
 	}
 
@@ -228,7 +228,7 @@ func TestSecretComparisonChangeData1(t *testing.T) {
 		Name: "myName",
 		Namespace: "myNamespace",
 		Type: "Opaque",
-		Target: SecretTargetKubernetes,
+		TargetType: SecretTargetTypeKubernetes,
 		Data: map[string]string {
 			"key1": "value1",
 			"key2": "value2",
@@ -239,7 +239,7 @@ func TestSecretComparisonChangeData1(t *testing.T) {
 		Name: "myName",
 		Namespace: "myNamespace",
 		Type: "Opaque",
-		Target: SecretTargetKubernetes,
+		TargetType: SecretTargetTypeKubernetes,
 		Data: map[string]string {
 			"key1": "newValue1",
 			"key2": "value2",
@@ -262,7 +262,7 @@ func TestSecretComparisonChangeData2(t *testing.T) {
 		Name: "myName",
 		Namespace: "myNamespace",
 		Type: "Opaque",
-		Target: SecretTargetKubernetes,
+		TargetType: SecretTargetTypeKubernetes,
 		Data: map[string]string {
 			"key2": "value2",
 			"key1": "value1",
@@ -273,7 +273,7 @@ func TestSecretComparisonChangeData2(t *testing.T) {
 		Name: "myName",
 		Namespace: "myNamespace",
 		Type: "Opaque",
-		Target: SecretTargetKubernetes,
+		TargetType: SecretTargetTypeKubernetes,
 		Data: map[string]string {
 			"key1": "newValue1",
 			"key2": "newValue2",
@@ -300,7 +300,7 @@ func TestSecretComparisonChangeData3(t *testing.T) {
 		Name: "myName",
 		Namespace: "myNamespace",
 		Type: "Opaque",
-		Target: SecretTargetKubernetes,
+		TargetType: SecretTargetTypeKubernetes,
 		Data: map[string]string {
 			"key1": "value1",
 			"key2": "value2",
@@ -311,7 +311,7 @@ func TestSecretComparisonChangeData3(t *testing.T) {
 		Name: "myName",
 		Namespace: "myNamespace",
 		Type: "Opaque",
-		Target: SecretTargetKubernetes,
+		TargetType: SecretTargetTypeKubernetes,
 		Data: map[string]string {
 			"key1": "newValue1",
 			"key3": "value3",
@@ -342,7 +342,7 @@ func TestSecretComparisonRemoveSecret(t *testing.T) {
 		Name: "myName",
 		Namespace: "myNamespace",
 		Type: "Opaque",
-		Target: SecretTargetKubernetes,
+		TargetType: SecretTargetTypeKubernetes,
 		Data: map[string]string {
 			"key1": "value1",
 			"key2": "value2",
@@ -369,7 +369,7 @@ func TestSecretComparisonAddSecret(t *testing.T) {
 		Name: "myName",
 		Namespace: "myNamespace",
 		Type: "Opaque",
-		Target: SecretTargetKubernetes,
+		TargetType: SecretTargetTypeKubernetes,
 		Data: map[string]string {
 			"key1": "value1",
 			"key2": "value2",

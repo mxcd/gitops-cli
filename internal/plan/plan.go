@@ -11,7 +11,7 @@ type Plan struct {
 	// List of items in the plan
 	Items []PlanItem
 	// Target type of the plan
-	Target secret.SecretTarget
+	TargetType secret.SecretTargetType
 }
 
 type PlanItem struct {
@@ -50,10 +50,10 @@ func (p *Plan) Print() {
 }
 
 func (p *Plan) Execute() error {
-	if p.Target == secret.SecretTargetKubernetes {
+	if p.TargetType == secret.SecretTargetTypeKubernetes {
 		return executeKubernetesPlan(p)
 
-	} else if p.Target == secret.SecretTargetVault {
+	} else if p.TargetType == secret.SecretTargetTypeVault {
 		log.Fatal("Not implemented")
 		return nil
 	}
@@ -68,21 +68,21 @@ func executeKubernetesPlan(p *Plan) error {
 		}
 		if item.Diff.Type == secret.SecretDiffTypeAdded {
 			log.Trace("Secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " is new, creating...")
-			err := k8s.CreateSecret(item.LocalSecret)
+			err := k8s.CreateSecret(item.LocalSecret, item.LocalSecret.Target)
 			if err != nil {
 				log.Error("Failed to create secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " in cluster")
 				return err
 			}
 		} else if item.Diff.Type == secret.SecretDiffTypeChanged {
 			log.Trace("Secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " is modified, updating...")
-			err := k8s.UpdateSecret(item.LocalSecret)
+			err := k8s.UpdateSecret(item.LocalSecret, item.LocalSecret.Target)
 			if err != nil {
 				log.Error("Failed to update secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " in cluster")
 				return err
 			}
 		} else if item.Diff.Type == secret.SecretDiffTypeRemoved {
 			log.Trace("Secret ", item.RemoteSecret.Namespace, "/", item.RemoteSecret.Name, " is deleted, deleting...")
-			err := k8s.DeleteSecret(item.RemoteSecret)
+			err := k8s.DeleteSecret(item.RemoteSecret, item.RemoteSecret.Target)
 			if err != nil {
 				log.Error("Failed to delete secret ", item.RemoteSecret.Namespace, "/", item.RemoteSecret.Name, " in cluster")
 				return err

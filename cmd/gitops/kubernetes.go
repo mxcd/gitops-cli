@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/TwiN/go-color"
 	"github.com/google/uuid"
 	"github.com/mxcd/gitops-cli/internal/k8s"
@@ -8,6 +11,7 @@ import (
 	"github.com/mxcd/gitops-cli/internal/secret"
 	"github.com/mxcd/gitops-cli/internal/state"
 	"github.com/mxcd/gitops-cli/internal/util"
+	"github.com/schollz/progressbar/v3"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -19,13 +23,14 @@ func applyKubernetes(c *cli.Context) error {
 		return err
 	}
 
-	prettyPrintPlan(p)
-
+	// exit if there is nothing to do
 	if p.NothingToDo() {
 		println(color.InGreen("No changes to apply."))
 		exitApplication(c, true)
 		return nil
-	}
+	} 
+
+	prettyPrintPlan(p)
 	
 	if !c.Bool("auto-approve") {
 		println("GitOps CLI will apply these changes to your Kubernetes cluster.")
@@ -55,45 +60,79 @@ func applyKubernetes(c *cli.Context) error {
 }
 
 func planKubernetes(c *cli.Context) error {
+	clusterLimitString := getClusterLimit(c)
+
 	p, err := createKubernetesPlan(c)
 	if err != nil {
 		return err
 	}
-	prettyPrintPlan(p)
 
 	if p.NothingToDo() {
 		println(color.InGreen("No changes to apply."))
 	} else {
-		println(color.InBold("use"), color.InGreen(color.InBold("gitops secrets apply kubernetes")), color.InBold("to apply these changes to your cluster"))
+		prettyPrintPlan(p)
+		dirLimitString := ""
+		if c.String("dir") != "" {
+			dirLimitString = " --dir " + c.String("dir")
+		}
+		applyString := fmt.Sprintf("gitops secrets%s apply kubernetes %s", dirLimitString, clusterLimitString)
+		println(color.InBold("use"), color.InGreen(color.InBold(applyString)), color.InBold("to apply these changes to your cluster"))
 	}
 	exitApplication(c, false)
 	return nil
 }
 
 func createKubernetesPlan(c *cli.Context) (*plan.Plan, error) {
-	err := k8s.InitKubernetesClient(c)
+	log.Trace("Creating Kubernetes plan")
+	clusterLimit := getClusterLimit(c)
+
+	limitPrintln := false
+
+	if clusterLimit != "" {
+		println("Limiting to cluster " + color.InBlue(clusterLimit))
+		limitPrintln = true
+	}
+	
+	dirLimit := getDirLimit(c)
+	if dirLimit != "" {
+		println("Limiting to directory " + color.InPurple(dirLimit))
+		limitPrintln = true
+	}
+
+	if limitPrintln {
+		println("")
+	}
+
+	err := k8s.InitClusterClients(c)
 	if err != nil {
 		log.Error("Failed to init Kubernetes cluster connection")
 		return nil, err
 	}
-	connectionEstablished, err := k8s.TestClusterConnection()
-	if !connectionEstablished || err != nil {
-		log.Error("Failed to connect to Kubernetes cluster")
-		return nil, err
-	}
-	localSecrets, err := secret.LoadLocalSecrets(secret.SecretTargetKubernetes)
+
+	localSecrets, err := secret.LoadLocalSecretsLimited(secret.SecretTargetTypeKubernetes, dirLimit, clusterLimit)
 	if err != nil {
-		log.Error("Failed to load local secrets with target ", secret.SecretTargetKubernetes)
+		log.Error("Failed to load local secrets with target ", secret.SecretTargetTypeKubernetes)
 		return nil, err
 	}
-	log.Trace("Loaded ", len(localSecrets), " local secrets with target ", secret.SecretTargetKubernetes)
+	log.Trace("Loaded ", len(localSecrets), " local secrets with target ", secret.SecretTargetTypeKubernetes)
 	
 	p := &plan.Plan{
-		Target: secret.SecretTargetKubernetes,
+		TargetType: secret.SecretTargetTypeKubernetes,
 		Items: []plan.PlanItem{},
 	}
 
+	bar := progressbar.NewOptions(len(localSecrets),
+		progressbar.OptionEnableColorCodes(true),
+		progressbar.OptionShowBytes(false),
+		progressbar.OptionSetWidth(50),
+		progressbar.OptionShowCount(),
+		progressbar.OptionSetElapsedTime(false),
+		progressbar.OptionSetPredictTime(false),
+		progressbar.OptionSetDescription("[green][Syncing local state with cluster][reset]"),
+	)
+	
 	for _, localSecret := range localSecrets {
+		bar.Add(1)
 		// check for local secret in state
 		// update ID in localSecret if secret exists in state
 		// update hash in state if secret exists in state
@@ -110,7 +149,8 @@ func createKubernetesPlan(c *cli.Context) (*plan.Plan, error) {
 		planItem := plan.PlanItem{
 			LocalSecret: localSecret,
 		}
-		remoteSecret, err := k8s.GetSecret(localSecret)
+
+		remoteSecret, err := k8s.GetSecret(localSecret, localSecret.Target)
 		if err != nil {
 			if k8sErrors.IsNotFound(err) {
 				log.Trace("Secret ", localSecret.Name, " does not exist in Kubernetes cluster")
@@ -124,6 +164,9 @@ func createKubernetesPlan(c *cli.Context) (*plan.Plan, error) {
 		planItem.ComputeDiff()
 		p.AddItem(planItem)
 	}
+	bar.Finish()
+	println("")
+	println("")
 
 	updatedStateSecrets := state.GetState().Secrets[:0]
 	for _, stateSecret := range state.GetState().Secrets {
@@ -135,8 +178,8 @@ func createKubernetesPlan(c *cli.Context) (*plan.Plan, error) {
 			}
 		}
 
-		// only add secret to updated state, if it still exists locally
-		if stateSecretFound {
+		// only add secret to updated state, if it still exists locally or if it is not in the scope of the current dir or cluster limits
+		if stateSecretFound || !strings.HasPrefix(stateSecret.Path, dirLimit) || stateSecret.Target != clusterLimit {
 			updatedStateSecrets = append(updatedStateSecrets, stateSecret)
 			continue
 		}
@@ -148,7 +191,7 @@ func createKubernetesPlan(c *cli.Context) (*plan.Plan, error) {
 			Name: stateSecret.Name,
 			Namespace: stateSecret.Namespace,
 			Type: stateSecret.Type,
-		})
+		}, stateSecret.Target)
 		if err != nil {
 			// only throw error if err is not "not found"
 			if !k8sErrors.IsNotFound(err) {
@@ -180,7 +223,28 @@ func createKubernetesPlan(c *cli.Context) (*plan.Plan, error) {
 	return p, nil
 }
 
+func getClusterLimit(c *cli.Context) string {
+	clusterLimit := c.Args().Get(0)
+	if clusterLimit != "" {
+		log.Trace("Limiting to cluster ", clusterLimit)
+	} else {
+		log.Trace("No cluster limit set. Applying to all clusters.")
+	}
+	return clusterLimit
+}
+
+func getDirLimit(c *cli.Context) string {
+	dirLimit := c.String("dir")
+	if dirLimit != "" {
+		log.Trace("Limiting to directory ", dirLimit)
+	} else {
+		log.Trace("No dir limit set. Collecting secrets in all directories.")
+	}
+	return dirLimit
+}
+
 func prettyPrintPlan(p *plan.Plan) {
+	println("")
 	println("GitOps CLI computed the following changes for your cluster:")
 	println("-------------------------------------------------------")
 	println("")

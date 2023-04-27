@@ -21,8 +21,11 @@ type Secret struct {
 	// Path is the path to the secret file
 	Path string
 
-	// Target is the target of the secret
-	Target SecretTarget
+	// TargetType is the target of the secret
+	TargetType SecretTargetType
+
+	// Target is the target system (cluster of vault instance)
+	Target string
 
 	// Type is the type of the secret
 	Type string
@@ -43,13 +46,14 @@ type Secret struct {
 	Data map[string]string
 }
 
-type SecretTarget string
-var SecretTargetVault SecretTarget = "vault"
-var SecretTargetKubernetes SecretTarget = "k8s"
-var SecretTargetAll SecretTarget = "all"
+type SecretTargetType string
+var SecretTargetTypeVault SecretTargetType = "vault"
+var SecretTargetTypeKubernetes SecretTargetType = "k8s"
+var SecretTargetTypeAll SecretTargetType = "all"
 
 type SecretFile struct {
-	Target     SecretTarget      `yaml:"target"`
+	TargetType SecretTargetType  `yaml:"targetType"`
+	Target     string            `yaml:"target"`
 	Name       string            `yaml:"name,omitempty"`
 	Namespace  string            `yaml:"namespace" default:"default"`
 	Type       string            `yaml:"type" default:"Opaque"`
@@ -98,8 +102,14 @@ func (s *Secret) Load() error {
 	var secretFile SecretFile
 	yaml.UnmarshalStrict(s.BinaryData, &secretFile)
 
-	s.Target = secretFile.Target
+	s.TargetType = secretFile.TargetType
 	
+	if secretFile.Target != "" {
+		s.Target = secretFile.Target
+	} else {
+		s.Target = string(util.DefaultClusterClient)
+	}
+
 	if secretFile.Name != "" {
 		s.Name = secretFile.Name
 	} else {
@@ -136,6 +146,7 @@ func (s *Secret) PrettyPrint() {
 	cleartext := util.GetCliContext().Bool("cleartext")
 	println("---")
 	println(s.CombinedName())
+	println("  targetType: " + string(s.TargetType))
 	println("  target: " + string(s.Target))
 	println("  type: " + s.Type)
 	println("  data:")

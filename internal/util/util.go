@@ -16,6 +16,11 @@ import (
 	"go.mozilla.org/sops/v3/decrypt"
 )
 
+type ClusterClientName string
+const (
+	DefaultClusterClient ClusterClientName = "__default"
+)
+
 // go over all files in the current directory (recursively)
 // and find all files that end with .secret.enc.yaml or .secret.enc.yml
 // return a list of these files
