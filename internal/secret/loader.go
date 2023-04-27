@@ -67,6 +67,7 @@ func LoadLocalSecretsLimited(targetTypeFilter SecretTargetType, directoryLimit s
 		secrets = append(secrets, secret)
 	}
 	bar.Finish()
-	println()
+	println("")
+	println("")
 	return secrets, nil
 }

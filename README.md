@@ -240,6 +240,135 @@ It is possible to use Go templates in the secret files. The values will originat
 Values files can be located anywhere in the repository. The GitOps CLI will pick up all files that are located on the direct path towards the respective secret file.  
 Values files closer to the secret file will have higher precedence. Any object structure is allowed to be used in a values file.
 
+Example: 
+
+```yaml
+# /foo/bar/dev/values.gitops.secret.enc.yaml
+environment: dev
+database:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: postgres
+```
+
+```yaml
+# /foo/bar/dev/values.gitops.secret.enc.yaml
+targetType: k8s
+# name of the secret - will be used as path in vault
+name: my-service
+namespace: "{{ .Values.environment }}"
+data:
+  application.properties: |-
+    service.environment={{ .Values.environment }}
+    spring.datasource.url=jdbc:postgresql://{{ .Values.database.host }}:{{ .Values.database.port }}/mydb
+    spring.datasource.username={{ .Values.database.user }}
+    spring.datasource.password={{ .Values.database.password }}
+```
+**NOTE** that the template string (`{{ .Values.someValue }}`) must be enclosed in quotes for sops to work properly. In the above example, the entire `application.properties` data value is considered as a string and thus does not need further quoting.
+
+#### Multi-cluster support
+It is possible to address multiple clusters with a single GitOps repository.  
+To add a new cluster to the GitOps state use
+```
+gitops clusters add <cluster-name> <kubeconfig-path>
+```
+The kubeconfig file can either be a plain text file or a sops-encrypted file. If the file is encrypted, it must adhere to the following naming convention to be decrypted properly: 
+```
+*.kubeconfig.secret.enc.ya?ml
+```
+  
+To inspect the currently configured clusters use
+```
+gitops clusters list
+```
+```
+__             _ __
+\ \     ____ _(_) /_____  ____  _____
+ \ \   / __ `/ / __/ __ \/ __ \/ ___/
+ / /  / /_/ / / /_/ /_/ / /_/ (__  )
+/_/   \__, /_/\__/\____/ .___/____/
+     /____/           /_/
+
+dev  =>  kubeconfigs/dev.kubeconfig.secret.enc.yml
+int  =>  kubeconfigs/int.kubeconfig.secret.enc.yml
+prod  =>  kubeconfigs/prod.kubeconfig.secret.enc.yml
+```
+  
+To remove a cluster from the GitOps state use
+```
+gitops clusters remove <cluster-name>
+```
+
+To check connectivity with the configured clusters use
+```
+gitops clusters test
+```
+```
+__             _ __
+\ \     ____ _(_) /_____  ____  _____
+ \ \   / __ `/ / __/ __ \/ __ \/ ___/
+ / /  / /_/ / / /_/ /_/ / /_/ (__  )
+/_/   \__, /_/\__/\____/ .___/____/
+     /____/           /_/
+
+Cluster: __default (v1.25.3)    Connected: true
+Cluster: dev (v1.24.8)          Connected: true
+Cluster: int (v1.24.8)          Connected: true
+Cluster: prod (v1.24.8)         Connected: true
+```
+  
+A secret can be configured to be applied to a specific cluster using the `target` attribute in the secret file. The default value is the `__default` cluster which is inferred from the `KUBECONFIG` environment variable or the default kubeconfig file. The `target` attribute can also be set using a templating variable so that all secrets under a certain directory will be applied to a specific cluster.
+```yaml
+# /foo/bar/dev/values.gitops.secret.enc.yaml
+target: dev
+```
+```yaml
+# /foo/bar/dev/myservice/service.gitops.secret.enc.yaml
+targetType: k8s
+target: "{{ .Values.target }}" # will be replaced with "dev"
+name: my-service
+data:
+  key: value
+```
+  
+By default, secrets will be applied to all configured clusters. This can be limited by giving the cluster as an argument:
+```
+gitops secrets plan kubernetes dev
+__             _ __
+\ \     ____ _(_) /_____  ____  _____
+ \ \   / __ `/ / __/ __ \/ __ \/ ___/
+ / /  / /_/ / / /_/ /_/ / /_/ (__  )
+/_/   \__, /_/\__/\____/ .___/____/
+     /____/           /_/
+
+Limiting to cluster dev
+
+[Loading local secrets] 100% |██████████████████████████████████████████████████| (63/63) 
+
+
+No changes to apply.
+```
+
+#### Directory limiter
+It is possible to restrict the secrets input to a specific directory to speed up loading and decryption of secrets. This can be done by providing the `--dir` flag:
+```
+gitops secrets --dir application/dev plan kubernetes
+
+__             _ __
+\ \     ____ _(_) /_____  ____  _____
+ \ \   / __ `/ / __/ __ \/ __ \/ ___/
+ / /  / /_/ / / /_/ /_/ / /_/ (__  )
+/_/   \__, /_/\__/\____/ .___/____/
+     /____/           /_/
+
+Limiting to directory applications/dev
+
+[Loading local secrets] 100% |██████████████████████████████████████████████████| (1/1) 
+
+No changes to apply.
+```
+**NOTE** that the directory path must be relative to the repository root and that only forward slashes (`/`) are supported.
 ## Repository
 
 ### After the first clone
