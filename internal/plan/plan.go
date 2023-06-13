@@ -40,8 +40,11 @@ func (i *PlanItem) ComputeDiff() {
 	i.Diff = secret.CompareSecrets(i.RemoteSecret, i.LocalSecret)
 }
 
-func (p *Plan) Print() {
+func (p *Plan) Print(showUnchanged bool) {
 	for i, item := range p.Items {
+		if !showUnchanged && item.Diff.Equal {
+			continue
+		}
 		item.Diff.Print()
 		if i < len(p.Items)-1 {
 			println("---")

@@ -28,15 +28,15 @@ func applyKubernetes(c *cli.Context) error {
 		println(color.InGreen("No changes to apply."))
 		exitApplication(c, true)
 		return nil
-	} 
+	}
 
-	prettyPrintPlan(p)
-	
+	prettyPrintPlan(p, c.Bool("show-unchanged"))
+
 	if !c.Bool("auto-approve") {
 		println("GitOps CLI will apply these changes to your Kubernetes cluster.")
 		println("Only 'yes' will be accepted to approve.")
 		promtAnswer := util.StringPrompt("Apply changes above: ")
-		
+
 		if promtAnswer != "yes" {
 			println("Aborting")
 			return nil
@@ -70,7 +70,7 @@ func planKubernetes(c *cli.Context) error {
 	if p.NothingToDo() {
 		println(color.InGreen("No changes to apply."))
 	} else {
-		prettyPrintPlan(p)
+		prettyPrintPlan(p, c.Bool("show-unchanged"))
 		dirLimitString := ""
 		if c.String("dir") != "" {
 			dirLimitString = " --dir " + c.String("dir")
@@ -92,7 +92,7 @@ func createKubernetesPlan(c *cli.Context) (*plan.Plan, error) {
 		println("Limiting to cluster " + color.InBlue(clusterLimit))
 		limitPrintln = true
 	}
-	
+
 	dirLimit := getDirLimit(c)
 	if dirLimit != "" {
 		println("Limiting to directory " + color.InPurple(dirLimit))
@@ -115,10 +115,10 @@ func createKubernetesPlan(c *cli.Context) (*plan.Plan, error) {
 		return nil, err
 	}
 	log.Trace("Loaded ", len(localSecrets), " local secrets with target ", secret.SecretTargetTypeKubernetes)
-	
+
 	p := &plan.Plan{
 		TargetType: secret.SecretTargetTypeKubernetes,
-		Items: []plan.PlanItem{},
+		Items:      []plan.PlanItem{},
 	}
 
 	bar := progressbar.NewOptions(len(localSecrets),
@@ -130,7 +130,7 @@ func createKubernetesPlan(c *cli.Context) (*plan.Plan, error) {
 		progressbar.OptionSetPredictTime(false),
 		progressbar.OptionSetDescription("[green][Syncing local state with cluster][reset]"),
 	)
-	
+
 	for _, localSecret := range localSecrets {
 		bar.Add(1)
 		// check for local secret in state
@@ -173,7 +173,7 @@ func createKubernetesPlan(c *cli.Context) (*plan.Plan, error) {
 		stateSecretFound := false
 		for _, localSecret := range localSecrets {
 			if stateSecret.Path == localSecret.Path {
-				stateSecretFound = true		
+				stateSecretFound = true
 				break
 			}
 		}
@@ -188,9 +188,9 @@ func createKubernetesPlan(c *cli.Context) (*plan.Plan, error) {
 		// therefore we are checking if the cluster secret actually exists
 		log.Trace("Secret ", stateSecret.CombinedName(), " does not exist locally")
 		remoteSecret, err := k8s.GetSecret(&secret.Secret{
-			Name: stateSecret.Name,
+			Name:      stateSecret.Name,
 			Namespace: stateSecret.Namespace,
-			Type: stateSecret.Type,
+			Type:      stateSecret.Type,
 		}, stateSecret.Target)
 		if err != nil {
 			// only throw error if err is not "not found"
@@ -211,7 +211,7 @@ func createKubernetesPlan(c *cli.Context) (*plan.Plan, error) {
 		// at this state, the local secret does not exist anymore, but the secret is still in the state
 		// also, the cluster still holds the secret which needs to be deleted
 		planItem := plan.PlanItem{
-			LocalSecret: nil,
+			LocalSecret:  nil,
 			RemoteSecret: remoteSecret,
 		}
 		planItem.ComputeDiff()
@@ -243,12 +243,12 @@ func getDirLimit(c *cli.Context) string {
 	return dirLimit
 }
 
-func prettyPrintPlan(p *plan.Plan) {
+func prettyPrintPlan(p *plan.Plan, showUnchanged bool) {
 	println("")
 	println("GitOps CLI computed the following changes for your cluster:")
 	println("-------------------------------------------------------")
 	println("")
-	p.Print()
+	p.Print(showUnchanged)
 	println("")
 	println("-------------------------------------------------------")
 	println("")
