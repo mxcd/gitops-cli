@@ -17,68 +17,73 @@ func main() {
 		Usage: "GitOps CLI",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:  "root-dir",
-				Value: "",
-				Usage: "root directory of the git repository",
+				Name:    "root-dir",
+				Value:   "",
+				Usage:   "root directory of the git repository",
 				EnvVars: []string{"GITOPS_ROOT_DIR"},
 			},
 			&cli.StringFlag{
-				Name:  "kubeconfig",
+				Name:    "kubeconfig",
 				Aliases: []string{"k"},
-				Value: "",
-				Usage: "kubeconfig file to use for connecting to the Kubernetes cluster",
+				Value:   "",
+				Usage:   "kubeconfig file to use for connecting to the Kubernetes cluster",
 				EnvVars: []string{"KUBECONFIG", "GITOPS_KUBECONFIG"},
 			},
 			&cli.BoolFlag{
-				Name:  "verbose",
+				Name:    "verbose",
 				Aliases: []string{"v"},
-				Usage: "debug output",
+				Usage:   "debug output",
 				EnvVars: []string{"GITOPS_VERBOSE"},
 			},
 			&cli.BoolFlag{
-				Name:  "very-verbose",
+				Name:    "very-verbose",
 				Aliases: []string{"vv"},
-				Usage: "trace output",
+				Usage:   "trace output",
 				EnvVars: []string{"GITOPS_VERY_VERBOSE"},
 			},
 			&cli.BoolFlag{
-				Name:  "cleartext",
-				Usage: "print secrets in cleartext to the console",
+				Name:    "cleartext",
+				Usage:   "print secrets in cleartext to the console",
 				EnvVars: []string{"GITOPS_CLEARTEXT"},
 			},
 			&cli.BoolFlag{
-				Name:  "print",
-				Usage: "print secrets to the console",
+				Name:    "print",
+				Usage:   "print secrets to the console",
 				EnvVars: []string{"GITOPS_PRINT"},
+			},
+			&cli.BoolFlag{
+				Name:    "show-unchanged",
+				Usage:   "display unchanged secrets in the plan overview",
+				EnvVars: []string{"GITOPS_SHOW_UNCHANGED"},
 			},
 		},
 		Commands: []*cli.Command{
 			{
-				Name: "secrets",
+				Name:    "secrets",
 				Aliases: []string{"s"},
-				Usage: "GitOps managed secrets",
+				Usage:   "GitOps managed secrets",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
-						Name: "dir",
+						Name:    "dir",
 						Aliases: []string{"d"},
-						Value: "",
-						Usage: "directory to limit secret discovery to",
+						Value:   "",
+						Usage:   "directory to limit secret discovery to",
 						EnvVars: []string{"GITOPS_SECRETS_DIR"},
 					},
 				},
 				Subcommands: []*cli.Command{
 					{
-						Name: "apply",
+						Name:    "apply",
 						Aliases: []string{"a"},
-						Usage: "Push secrets into your infrastructure",
+						Usage:   "Push secrets into your infrastructure",
 						Subcommands: []*cli.Command{
 							{
-								Name: "kubernetes",
+								Name:    "kubernetes",
 								Aliases: []string{"k8s"},
-								Usage: "Push secrets into a Kubernetes cluster",
+								Usage:   "Push secrets into a Kubernetes cluster",
 								Flags: []cli.Flag{
 									&cli.BoolFlag{
-										Name: "auto-approve",
+										Name:  "auto-approve",
 										Usage: "apply the changes without prompting for approval",
 									},
 								},
@@ -88,7 +93,7 @@ func main() {
 								},
 							},
 							{
-								Name: "vault",
+								Name:  "vault",
 								Usage: "Push secrets into vault",
 								Action: func(c *cli.Context) error {
 									log.Fatal("Not implemented yet")
@@ -98,14 +103,14 @@ func main() {
 						},
 					},
 					{
-						Name: "plan",
+						Name:    "plan",
 						Aliases: []string{"p"},
-						Usage: "Plan the application of secrets into your infrastructure",
+						Usage:   "Plan the application of secrets into your infrastructure",
 						Subcommands: []*cli.Command{
 							{
-								Name: "kubernetes",
+								Name:    "kubernetes",
 								Aliases: []string{"k8s"},
-								Usage: "Plan the application of secrets into a Kubernetes cluster",
+								Usage:   "Plan the application of secrets into a Kubernetes cluster",
 
 								Action: func(c *cli.Context) error {
 									initApplication(c)
@@ -115,7 +120,7 @@ func main() {
 						},
 					},
 					{
-						Name: "template",
+						Name:  "template",
 						Usage: "Test the templating of secrets",
 						Action: func(c *cli.Context) error {
 							initApplication(c)
@@ -125,11 +130,11 @@ func main() {
 				},
 			},
 			{
-				Name: "clusters",
+				Name:  "clusters",
 				Usage: "Managing target clusters",
 				Subcommands: []*cli.Command{
 					{
-						Name: "list",
+						Name:  "list",
 						Usage: "List all target clusters",
 						Action: func(c *cli.Context) error {
 							initApplication(c)
@@ -145,7 +150,7 @@ func main() {
 						},
 					},
 					{
-						Name: "add",
+						Name:  "add",
 						Usage: "Add a target cluster. <name> <configFile>",
 						Action: func(c *cli.Context) error {
 							initApplication(c)
@@ -159,7 +164,7 @@ func main() {
 								log.Fatal("Usage: gitops clusters add <name> <configFile>")
 							}
 							err := state.GetState().AddCluster(&state.ClusterState{
-								Name: c.Args().Get(0),
+								Name:       c.Args().Get(0),
 								ConfigFile: kubeconfig,
 							})
 							if err != nil {
@@ -169,7 +174,7 @@ func main() {
 						},
 					},
 					{
-						Name: "remove",
+						Name:  "remove",
 						Usage: "Remove a target cluster",
 						Action: func(c *cli.Context) error {
 							initApplication(c)
@@ -184,7 +189,7 @@ func main() {
 						},
 					},
 					{
-						Name: "test",
+						Name:  "test",
 						Usage: "Test a target cluster connection",
 						Action: func(c *cli.Context) error {
 							initApplication(c)
