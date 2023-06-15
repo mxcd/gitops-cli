@@ -179,7 +179,7 @@ func createKubernetesPlan(c *cli.Context) (*plan.Plan, error) {
 		}
 
 		// only add secret to updated state, if it still exists locally or if it is not in the scope of the current dir or cluster limits
-		if stateSecretFound || !strings.HasPrefix(stateSecret.Path, dirLimit) || stateSecret.Target != clusterLimit {
+		if stateSecretFound || !strings.HasPrefix(stateSecret.Path, dirLimit) || (stateSecret.Target != clusterLimit && clusterLimit != "") {
 			updatedStateSecrets = append(updatedStateSecrets, stateSecret)
 			continue
 		}
