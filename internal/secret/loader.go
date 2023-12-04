@@ -66,7 +66,7 @@ func LoadLocalSecretsLimited(targetTypeFilter SecretTargetType, directoryLimit s
 			continue
 		}
 		for _, s := range secrets {
-			if s.Name == secret.Name && s.Target == secret.Target {
+			if s.Name == secret.Name && s.Target == secret.Target && s.Namespace == secret.Namespace {
 				bar.Finish()
 				println("")
 				log.Error("Unable to load secret '", secret.Name, "' from '", secret.Path, "' because a secret with the same name and target already exists: '", s.Path, "'")
