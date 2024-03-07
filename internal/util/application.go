@@ -1,32 +1,13 @@
-package main
+package util
 
 import (
-	"github.com/mxcd/gitops-cli/internal/state"
-	"github.com/mxcd/gitops-cli/internal/util"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
 
-func initApplication(c *cli.Context) error  {
-	printLogo(c)
-	setLogLevel(c)
-	util.SetCliContext(c)
-	util.GetRootDir()
-	err := state.LoadState(c)
-	return err
-}
-
-func exitApplication(c *cli.Context, writeState bool) error {
-	var err error
-	if writeState {
-		err = state.GetState().Save(c)
-	}
-	return err
-}
-
-func setLogLevel(c *cli.Context) {
+func SetLogLevel(c *cli.Context) {
 	log.SetLevel(log.InfoLevel)
-	
+
 	if c.Bool("verbose") {
 		log.SetLevel(log.DebugLevel)
 	}
@@ -36,7 +17,7 @@ func setLogLevel(c *cli.Context) {
 	}
 }
 
-func printLogo(c *cli.Context) {
+func PrintLogo(c *cli.Context) {
 	if c.Bool("no-logo") {
 		return
 	}

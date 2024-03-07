@@ -11,6 +11,24 @@
       "mode": "auto",
       "program": "cmd/gitops",
       "args": ["secrets", "a", "k8s", "-auto-approve"]
+    },
+    {
+      "name": "gitops patch test",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "cmd/gitops",
+      "args": [
+        "--verbose",
+        "patch",
+        "--basicauth",
+        "mparten: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",
+        "--repo",
+        "https://git.i.mercedes-benz.com/itocg-smb-devops/cluster",
+        "applications/int/service-userandroles-v3/values.yaml",
+        "service-tomcat.service.image.tag",
+        "3.1.2.42"
+      ]
     }
   ]
 }
