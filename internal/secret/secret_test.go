@@ -12,7 +12,7 @@ func TestLoadSecret1(t *testing.T) {
 	secret := Secret {
 		Path: f,
 	}
-	err := secret.Load()
+	err := secret.Load("")
 
 	if err != nil {
 		t.Error(err)
@@ -31,7 +31,7 @@ func TestLoadSecret2(t *testing.T) {
 	secret := Secret {
 		Path: f,
 	}
-	err := secret.Load()
+	err := secret.Load("")
 
 	if err != nil {
 		t.Error(err)

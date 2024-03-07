@@ -14,26 +14,33 @@ import (
 )
 
 type TemplateValues []*TemplateValuesPath
+
 var templateValues = TemplateValues{}
 
 type TemplateValuesPath struct {
-	Path          string
-	Values        map[interface{}]interface{}
-	MergedValues  map[interface{}]interface{}
+	Path         string
+	Values       map[interface{}]interface{}
+	MergedValues map[interface{}]interface{}
 }
 
 var loaded = false
-func LoadValues() error {
+
+func LoadValues(directoryLimit string) error {
 	log.Trace("Loading values files")
 	secretFiles, err := util.GetSecretFiles()
 	if err != nil {
 		return err
 	}
 	var valuesFiles []string
-	for _, secretFile := range secretFiles {
-		if strings.HasSuffix(secretFile, "values.gitops.secret.enc.yaml") || strings.HasSuffix(secretFile, "values.gitops.secret.enc.yml") {
-			valuesFiles = append(valuesFiles, secretFile)
+	for _, secretFileName := range secretFiles {
+		if !strings.HasSuffix(secretFileName, "values.gitops.secret.enc.yaml") && !strings.HasSuffix(secretFileName, "values.gitops.secret.enc.yml") {
+			continue
 		}
+		if !valuesFileApplicable(secretFileName, directoryLimit) {
+			log.Trace("Skipping values file due to directory filter: ", secretFileName)
+			continue
+		}
+		valuesFiles = append(valuesFiles, secretFileName)
 	}
 
 	for _, valuesFile := range valuesFiles {
@@ -46,8 +53,8 @@ func LoadValues() error {
 		var values map[interface{}]interface{}
 		yaml.UnmarshalStrict(decryptedFileContent, &values)
 		templateValues = append(templateValues, &TemplateValuesPath{
-			Path:    fmt.Sprintf("%s/", filepath.ToSlash(filepath.Dir(valuesFile))),
-			Values:  values,
+			Path:   fmt.Sprintf("%s/", filepath.ToSlash(filepath.Dir(valuesFile))),
+			Values: values,
 		})
 	}
 
@@ -59,20 +66,20 @@ func LoadValues() error {
 func mergeMaps(a, b map[interface{}]interface{}) map[interface{}]interface{} {
 	out := make(map[interface{}]interface{}, len(a))
 	for k, v := range a {
-			out[k] = v
+		out[k] = v
 	}
 	for k, v := range b {
-			// If you use map[string]interface{}, ok is always false here.
-			// Because yaml.Unmarshal will give you map[interface{}]interface{}.
-			if v, ok := v.(map[interface{}]interface{}); ok {
-					if bv, ok := out[k]; ok {
-							if bv, ok := bv.(map[interface{}]interface{}); ok {
-									out[k] = mergeMaps(bv, v)
-									continue
-							}
-					}
+		// If you use map[string]interface{}, ok is always false here.
+		// Because yaml.Unmarshal will give you map[interface{}]interface{}.
+		if v, ok := v.(map[interface{}]interface{}); ok {
+			if bv, ok := out[k]; ok {
+				if bv, ok := bv.(map[interface{}]interface{}); ok {
+					out[k] = mergeMaps(bv, v)
+					continue
+				}
 			}
-			out[k] = v
+		}
+		out[k] = v
 	}
 	return out
 }
@@ -100,9 +107,9 @@ func (t TemplateValues) merge() {
 	}
 }
 
-func GetValuesForPath(path string) map[interface{}]interface{} {
+func GetValuesForPath(path string, directoryLimit string) map[interface{}]interface{} {
 	if !loaded {
-		err := LoadValues()
+		err := LoadValues(directoryLimit)
 		if err != nil {
 			log.Panic(err)
 		}
@@ -125,4 +132,33 @@ func GetValuesForPath(path string) map[interface{}]interface{} {
 	}
 
 	return values
+}
+
+func valuesFileApplicable(secretFile, directoryLimit string) bool {
+	secretFile = filepath.Clean(secretFile)
+	directoryLimit = filepath.Clean(directoryLimit)
+
+	if directoryLimit == "" {
+		return true
+	}
+
+	secretFileParentDir := filepath.Dir(secretFile)
+	secretFileDirectoryElements := strings.Split(secretFileParentDir, string(filepath.Separator))
+	directoryLimitElements := strings.Split(directoryLimit, string(filepath.Separator))
+
+	if len(secretFileDirectoryElements) <= len(directoryLimitElements) {
+		for i, secretFileDirectoryElement := range secretFileDirectoryElements {
+			if secretFileDirectoryElement != directoryLimitElements[i] {
+				return false
+			}
+		}
+	} else {
+		for i, directoryLimitElement := range directoryLimitElements {
+			if directoryLimitElement != secretFileDirectoryElements[i] {
+				return false
+			}
+		}
+	}
+
+	return true
 }

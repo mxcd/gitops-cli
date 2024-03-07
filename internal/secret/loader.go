@@ -52,7 +52,7 @@ func LoadLocalSecretsLimited(targetTypeFilter SecretTargetType, directoryLimit s
 	)
 	for _, secretFileName := range secretFileNames {
 		bar.Add(1)
-		secret, err := FromPath(secretFileName)
+		secret, err := FromPath(secretFileName, directoryLimit)
 		if err != nil {
 			bar.Finish()
 			return nil, err
