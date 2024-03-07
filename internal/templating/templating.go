@@ -138,7 +138,7 @@ func valuesFileApplicable(secretFile, directoryLimit string) bool {
 	secretFile = filepath.Clean(secretFile)
 	directoryLimit = filepath.Clean(directoryLimit)
 
-	if directoryLimit == "" {
+	if directoryLimit == "." {
 		return true
 	}
 
