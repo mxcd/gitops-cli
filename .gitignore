@@ -6,6 +6,8 @@ homebrew-gitops/
 .gitops-state.yaml
 sandbox/
 
+.vscode/launch.json
+
 # Ignore "main" binary
 main
 # Ignore "gitops" binary
