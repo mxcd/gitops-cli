@@ -4,8 +4,12 @@ import (
 	"os"
 
 	"github.com/TwiN/go-color"
+	"github.com/mxcd/gitops-cli/internal/finalizer"
 	"github.com/mxcd/gitops-cli/internal/k8s"
+	"github.com/mxcd/gitops-cli/internal/kubernetes"
+	"github.com/mxcd/gitops-cli/internal/patch"
 	"github.com/mxcd/gitops-cli/internal/state"
+	"github.com/mxcd/gitops-cli/internal/templating"
 	"github.com/mxcd/gitops-cli/internal/util"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -89,7 +93,7 @@ func main() {
 								},
 								Action: func(c *cli.Context) error {
 									initApplication(c)
-									return applyKubernetes(c)
+									return kubernetes.ApplyKubernetes(c)
 								},
 							},
 							{
@@ -114,7 +118,7 @@ func main() {
 
 								Action: func(c *cli.Context) error {
 									initApplication(c)
-									return planKubernetes(c)
+									return kubernetes.PlanKubernetes(c)
 								},
 							},
 						},
@@ -124,7 +128,7 @@ func main() {
 						Usage: "Test the templating of secrets",
 						Action: func(c *cli.Context) error {
 							initApplication(c)
-							return testTemplating(c)
+							return templating.TestTemplating(c)
 						},
 					},
 				},
@@ -146,7 +150,7 @@ func main() {
 							for _, cluster := range clusters {
 								println(color.InBlue(cluster.Name), " => ", cluster.ConfigFile)
 							}
-							return exitApplication(c, true)
+							return finalizer.ExitApplication(c, true)
 						},
 					},
 					{
@@ -170,7 +174,7 @@ func main() {
 							if err != nil {
 								return err
 							}
-							return exitApplication(c, true)
+							return finalizer.ExitApplication(c, true)
 						},
 					},
 					{
@@ -185,7 +189,7 @@ func main() {
 							if err != nil {
 								return err
 							}
-							return exitApplication(c, true)
+							return finalizer.ExitApplication(c, true)
 						},
 					},
 					{
@@ -198,9 +202,37 @@ func main() {
 							for _, clusterClient := range clusterClients {
 								clusterClient.PrettyPrint()
 							}
-							return exitApplication(c, false)
+							return finalizer.ExitApplication(c, false)
 						},
 					},
+				},
+			},
+			{
+				Name:  "patch",
+				Usage: "Patch a single file in a GitOps cluster repository",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:    "repo",
+						Value:   "",
+						Usage:   "Repo to be used for the patch",
+						EnvVars: []string{"GITOPS_REPO"},
+					},
+					&cli.StringFlag{
+						Name:    "branch",
+						Value:   "main",
+						Usage:   "Branch to be used for the patch",
+						EnvVars: []string{"GITOPS_BRANCH"},
+					},
+					&cli.StringFlag{
+						Name:    "basicauth",
+						Value:   "",
+						Usage:   "BasicAuth for authenticating against the GitOps repository",
+						EnvVars: []string{"GITOPS_BASICAUTH"},
+					},
+				},
+				Action: func(c *cli.Context) error {
+					initApplication(c)
+					return patch.Patch(c)
 				},
 			},
 		},
@@ -210,4 +242,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func initApplication(c *cli.Context) error {
+	util.PrintLogo(c)
+	util.SetLogLevel(c)
+	util.SetCliContext(c)
+	util.GetRootDir()
+	err := state.LoadState(c)
+	return err
 }

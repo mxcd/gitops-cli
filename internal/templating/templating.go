@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/urfave/cli/v2"
 
 	"github.com/mxcd/gitops-cli/internal/util"
 	"gopkg.in/yaml.v2"
@@ -25,22 +26,17 @@ type TemplateValuesPath struct {
 
 var loaded = false
 
-func LoadValues(directoryLimit string) error {
+func LoadValues() error {
 	log.Trace("Loading values files")
 	secretFiles, err := util.GetSecretFiles()
 	if err != nil {
 		return err
 	}
 	var valuesFiles []string
-	for _, secretFileName := range secretFiles {
-		if !strings.HasSuffix(secretFileName, "values.gitops.secret.enc.yaml") && !strings.HasSuffix(secretFileName, "values.gitops.secret.enc.yml") {
-			continue
+	for _, secretFile := range secretFiles {
+		if strings.HasSuffix(secretFile, "values.gitops.secret.enc.yaml") || strings.HasSuffix(secretFile, "values.gitops.secret.enc.yml") {
+			valuesFiles = append(valuesFiles, secretFile)
 		}
-		if !valuesFileApplicable(secretFileName, directoryLimit) {
-			log.Trace("Skipping values file due to directory filter: ", secretFileName)
-			continue
-		}
-		valuesFiles = append(valuesFiles, secretFileName)
 	}
 
 	for _, valuesFile := range valuesFiles {
@@ -107,9 +103,9 @@ func (t TemplateValues) merge() {
 	}
 }
 
-func GetValuesForPath(path string, directoryLimit string) map[interface{}]interface{} {
+func GetValuesForPath(path string) map[interface{}]interface{} {
 	if !loaded {
-		err := LoadValues(directoryLimit)
+		err := LoadValues()
 		if err != nil {
 			log.Panic(err)
 		}
@@ -134,31 +130,18 @@ func GetValuesForPath(path string, directoryLimit string) map[interface{}]interf
 	return values
 }
 
-func valuesFileApplicable(secretFile, directoryLimit string) bool {
-	secretFile = filepath.Clean(secretFile)
-	directoryLimit = filepath.Clean(directoryLimit)
-
-	if directoryLimit == "." {
-		return true
+func TestTemplating(c *cli.Context) error {
+	secretFiles, err := util.GetSecretFiles()
+	if err != nil {
+		log.Fatal(err)
 	}
-
-	secretFileParentDir := filepath.Dir(secretFile)
-	secretFileDirectoryElements := strings.Split(secretFileParentDir, string(filepath.Separator))
-	directoryLimitElements := strings.Split(directoryLimit, string(filepath.Separator))
-
-	if len(secretFileDirectoryElements) <= len(directoryLimitElements) {
-		for i, secretFileDirectoryElement := range secretFileDirectoryElements {
-			if secretFileDirectoryElement != directoryLimitElements[i] {
-				return false
-			}
+	for _, secretFile := range secretFiles {
+		log.Debug(secretFile)
+		decryptedFile, err := util.DecryptFile(secretFile)
+		if err != nil {
+			log.Fatal(err)
 		}
-	} else {
-		for i, directoryLimitElement := range directoryLimitElements {
-			if directoryLimitElement != secretFileDirectoryElements[i] {
-				return false
-			}
-		}
+		log.Trace(string(decryptedFile))
 	}
-
-	return true
+	return nil
 }

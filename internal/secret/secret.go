@@ -47,7 +47,6 @@ type Secret struct {
 }
 
 type SecretTargetType string
-
 var SecretTargetTypeVault SecretTargetType = "vault"
 var SecretTargetTypeKubernetes SecretTargetType = "k8s"
 var SecretTargetTypeAll SecretTargetType = "all"
@@ -58,7 +57,7 @@ type SecretFile struct {
 	Name       string            `yaml:"name,omitempty"`
 	Namespace  string            `yaml:"namespace" default:"default"`
 	Type       string            `yaml:"type" default:"Opaque"`
-	Data       map[string]string `yaml:"data"`
+	Data			 map[string]string `yaml:"data"`
 	ID         string            `yaml:"id,omitempty"`
 }
 
@@ -66,7 +65,7 @@ type TemplateData struct {
 	Values map[interface{}]interface{}
 }
 
-func (s *Secret) Load(directoryLimit string) error {
+func (s *Secret) Load() error {
 	if s.Path == "" {
 		return errors.New("secret path is empty")
 	}
@@ -79,7 +78,7 @@ func (s *Secret) Load(directoryLimit string) error {
 
 	// execute templating on the secret file data
 	data := TemplateData{
-		Values: templating.GetValuesForPath(s.Path, directoryLimit),
+		Values: templating.GetValuesForPath(s.Path),
 	}
 	stringData := string(decryptedFileContent)
 	tmpl, err := template.New(s.Path).Parse(stringData)
@@ -104,7 +103,7 @@ func (s *Secret) Load(directoryLimit string) error {
 	yaml.UnmarshalStrict(s.BinaryData, &secretFile)
 
 	s.TargetType = secretFile.TargetType
-
+	
 	if secretFile.Target != "" {
 		s.Target = secretFile.Target
 	} else {
@@ -129,13 +128,13 @@ func (s *Secret) Load(directoryLimit string) error {
 	} else {
 		s.Type = "Opaque"
 	}
-
+		
 	s.Data = secretFile.Data
 
 	if util.GetCliContext().Bool("print") {
 		s.PrettyPrint()
 	}
-
+	
 	return nil
 }
 
@@ -161,15 +160,16 @@ func (s *Secret) PrettyPrint() {
 	}
 }
 
-func FromPath(path string, directoryLimit string) (*Secret, error) {
-	s := Secret{
+func FromPath(path string) (*Secret, error) {
+	s := Secret {
 		Path: path,
 	}
 
-	err := s.Load(directoryLimit)
+	err := s.Load()
 	if err != nil {
 		return nil, err
 	}
 
 	return &s, nil
 }
+

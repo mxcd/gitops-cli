@@ -4,6 +4,7 @@
 
 homebrew-gitops/
 .gitops-state.yaml
+sandbox/
 
 # Ignore "main" binary
 main
