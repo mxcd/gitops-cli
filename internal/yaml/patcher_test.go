@@ -1,4 +1,4 @@
-package patch
+package yaml
 
 import (
 	"testing"
@@ -111,10 +111,10 @@ var testCases = []TestCase{
 func TestYamlPatching(t *testing.T) {
 	test := func(testCase TestCase) {
 
-		pathedYamlString, err := patchYamlString(testCase.originalYaml, testCase.selector, testCase.value)
+		pathedYamlString, err := PatchYaml([]byte(testCase.originalYaml), testCase.selector, testCase.value)
 		assert.NoError(t, err)
 
-		assert.Equal(t, testCase.expectedYaml, pathedYamlString, "Patched data should be equal to expected data")
+		assert.Equal(t, testCase.expectedYaml, string(pathedYamlString), "Patched data should be equal to expected data")
 	}
 
 	for _, testCase := range testCases {

@@ -1,0 +1,7 @@
+service:
+  global:
+    namespace: foo
+  image:
+    repository: bar
+    tag: asdf1234
+  

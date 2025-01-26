@@ -6,6 +6,10 @@ homebrew-gitops/
 .gitops-state.yaml
 sandbox/
 
+hack/soft-serve/data
+hack/soft-serve/ssh-key
+hack/soft-serve/ssh-key.pub
+
 .vscode/launch.json
 
 # Ignore "main" binary

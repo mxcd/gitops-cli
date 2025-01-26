@@ -212,6 +212,18 @@ func main() {
 				Usage: "Patch a single file in a GitOps cluster repository",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
+						Name:    "repo-server",
+						Value:   "",
+						Usage:   "GitOps repo server to be used for the patch",
+						EnvVars: []string{"GITOPS_REPO_SERVER"},
+					},
+					&cli.StringFlag{
+						Name:    "repo-server-api-key",
+						Value:   "",
+						Usage:   "GitOps repo server to be used for the patch",
+						EnvVars: []string{"GITOPS_REPO_SERVER_API_KEY"},
+					},
+					&cli.StringFlag{
 						Name:    "repo",
 						Value:   "",
 						Usage:   "Repo to be used for the patch",
@@ -227,12 +239,12 @@ func main() {
 						Name:    "basicauth",
 						Value:   "",
 						Usage:   "BasicAuth for authenticating against the GitOps repository",
-						EnvVars: []string{"GITOPS_BASICAUTH"},
+						EnvVars: []string{"GITOPS_REPO_BASICAUTH"},
 					},
 				},
 				Action: func(c *cli.Context) error {
 					initApplication(c)
-					return patch.Patch(c)
+					return patch.PatchCommand(c)
 				},
 			},
 		},
