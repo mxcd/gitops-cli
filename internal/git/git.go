@@ -11,20 +11,19 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-type GitConnectionOptions struct {
+type ConnectionOptions struct {
 	Repository string
 	Branch     string
-	FilePath   string
 	Auth       transport.AuthMethod
 }
 
-type GitConnection struct {
+type Connection struct {
 	Repository *git.Repository
-	Options    *GitConnectionOptions
+	Options    *ConnectionOptions
 }
 
-func NewGitConnection(options *GitConnectionOptions) (*GitConnection, error) {
-	return &GitConnection{
+func NewGitConnection(options *ConnectionOptions) (*Connection, error) {
+	return &Connection{
 		Options: options,
 	}, nil
 }
@@ -47,11 +46,28 @@ func GetAuthFromBasicAuthString(basicAuth string) (transport.AuthMethod, error) 
 	}, nil
 }
 
-func GetAuthFromSshKey(sshKey []byte, sshKeyPassphrase string) (transport.AuthMethod, error) {
-	signer, err := ssh.ParsePrivateKey(sshKey)
-	if err != nil {
-		return nil, err
+func GetAuthFromSshKey(sshKey []byte, sshKeyPassphrase *string, noStrictHostKeyChecking bool) (transport.AuthMethod, error) {
+
+	var signer ssh.Signer
+	if sshKeyPassphrase != nil {
+		_signer, err := ssh.ParsePrivateKeyWithPassphrase(sshKey, []byte(*sshKeyPassphrase))
+		if err != nil {
+			return nil, err
+		}
+		signer = _signer
+	} else {
+		_signer, err := ssh.ParsePrivateKey(sshKey)
+		if err != nil {
+			return nil, err
+		}
+		signer = _signer
 	}
+
 	auth := &gitssh.PublicKeys{User: "git", Signer: signer}
+
+	if noStrictHostKeyChecking {
+		auth.HostKeyCallback = ssh.InsecureIgnoreHostKey()
+	}
+
 	return auth, nil
 }

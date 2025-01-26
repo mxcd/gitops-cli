@@ -21,11 +21,35 @@ func getSshKeyData(t *testing.T) []byte {
 	assert.NoError(t, err)
 	assert.NotEmpty(t, sshKey)
 
-  return sshKey
+	return sshKey
 }
 
-func TestGitPath(t *testing.T) {
-  sshKey := getSshKeyData(t)
+func TestGitSshPatch(t *testing.T) {
+	sshKey := getSshKeyData(t)
 
-  
+	options := &GitPatcherOptions{
+		Branch:                  "main",
+		RepositoryUrl:           "ssh://localhost:23231/gitops-test.git",
+		SshPrivateKey:           sshKey,
+		NoStrictHostKeyChecking: true,
+	}
+
+	patcher, err := NewGitPatcher(options)
+	assert.NoError(t, err)
+
+	err = patcher.Prepare()
+	assert.NoError(t, err)
+
+	patchTask := PatchTask{
+		FilePath: "applications/dev/service-test/values.yaml",
+		Patches: []Patch{
+			{
+				Selector: ".service.image.tag",
+				Value:    "v1.0.0",
+			},
+		},
+	}
+
+	err = patcher.Patch([]PatchTask{patchTask})
+	assert.NoError(t, err)
 }

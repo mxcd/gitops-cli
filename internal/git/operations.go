@@ -11,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func (c *GitConnection) Clone() error {
+func (c *Connection) Clone() error {
 	startTime := time.Now()
 	repo, err := git.Clone(memory.NewStorage(), memfs.New(), &git.CloneOptions{
 		URL:           c.Options.Repository,
@@ -33,7 +33,22 @@ func (c *GitConnection) Clone() error {
 	return nil
 }
 
-func (c *GitConnection) Commit(files []string, message string) (*plumbing.Hash, error) {
+func (c *Connection) Pull() error {
+	worktree, err := c.Repository.Worktree()
+	if err != nil {
+		log.WithError(err).Error("Error getting worktree")
+	}
+
+	err = worktree.Pull(&git.PullOptions{
+		RemoteName:   "origin",
+		Auth:         c.Options.Auth,
+		SingleBranch: true,
+	})
+
+	return err
+}
+
+func (c *Connection) Commit(files []string, message string) (*plumbing.Hash, error) {
 	worktree, err := c.Repository.Worktree()
 	if err != nil {
 		log.WithError(err).Error("Error getting worktree")
@@ -56,7 +71,7 @@ func (c *GitConnection) Commit(files []string, message string) (*plumbing.Hash, 
 	return &hash, err
 }
 
-func (c *GitConnection) Push(branch string) error {
+func (c *Connection) Push(branch string) error {
 	err := c.Repository.Push(&git.PushOptions{
 		RemoteName: "origin",
 		Auth:       c.Options.Auth,
@@ -71,7 +86,7 @@ func (c *GitConnection) Push(branch string) error {
 	return nil
 }
 
-func (c *GitConnection) HasChanges() (bool, error) {
+func (c *Connection) HasChanges() (bool, error) {
 	worktree, err := c.Repository.Worktree()
 	if err != nil {
 		log.WithError(err).Error("Error getting worktree")

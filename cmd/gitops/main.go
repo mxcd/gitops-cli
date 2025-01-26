@@ -241,6 +241,24 @@ func main() {
 						Usage:   "BasicAuth for authenticating against the GitOps repository",
 						EnvVars: []string{"GITOPS_REPO_BASICAUTH"},
 					},
+					&cli.StringFlag{
+						Name:    "ssh-key",
+						Value:   "",
+						Usage:   "SSH key for authenticating against the GitOps repository",
+						EnvVars: []string{"GITOPS_REPO_SSH_KEY"},
+					},
+					&cli.StringFlag{
+						Name:    "ssh-key-file",
+						Value:   "",
+						Usage:   "SSH key file for authenticating against the GitOps repository",
+						EnvVars: []string{"GITOPS_REPO_SSH_KEY_FILE"},
+					},
+					&cli.StringFlag{
+						Name:    "ssh-key-passphrase",
+						Value:   "",
+						Usage:   "SSH key passphrase for authenticating against the GitOps repository",
+						EnvVars: []string{"GITOPS_REPO_SSH_KEY_PASSPHRASE"},
+					},
 				},
 				Action: func(c *cli.Context) error {
 					initApplication(c)

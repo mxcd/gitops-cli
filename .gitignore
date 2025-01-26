@@ -6,7 +6,8 @@ homebrew-gitops/
 .gitops-state.yaml
 sandbox/
 
-hack/soft-serve/data
+hack/soft-serve/data/
+hack/soft-serve/gitops-test/
 hack/soft-serve/ssh-key
 hack/soft-serve/ssh-key.pub
 

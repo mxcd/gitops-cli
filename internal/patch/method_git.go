@@ -17,20 +17,22 @@ type GitPatcherOptions struct {
 	Branch        string
 	RepositoryUrl string
 
-	BasicAuth        string
-	SshPrivateKey    []byte
-	SshKeyPassphrase string
+	BasicAuth               string
+	SshPrivateKey           []byte
+	SshKeyPassphrase        *string
+	NoStrictHostKeyChecking bool
 }
 
 type GitPatcher struct {
 	Options       *GitPatcherOptions
-	GitConnection *git.GitConnection
+	GitConnection *git.Connection
 }
 
 func GetGitPatcherOptionsFromCli(c *cli.Context) (*GitPatcherOptions, error) {
 	options := &GitPatcherOptions{
-		Branch:        c.String("branch"),
-		RepositoryUrl: c.String("repo"),
+		Branch:                  c.String("branch"),
+		RepositoryUrl:           c.String("repo"),
+		NoStrictHostKeyChecking: c.Bool("no-strict-host-key-checking"),
 	}
 
 	if c.String("basicauth") != "" {
@@ -47,7 +49,10 @@ func GetGitPatcherOptionsFromCli(c *cli.Context) (*GitPatcherOptions, error) {
 		options.SshPrivateKey = file
 	}
 	if c.String("ssh-key-passphrase") != "" {
-		options.SshKeyPassphrase = c.String("ssh-key-passphrase")
+		passphrase := c.String("ssh-key-passphrase")
+		if passphrase != "" {
+			options.SshKeyPassphrase = &passphrase
+		}
 	}
 
 	return options, nil
@@ -73,14 +78,14 @@ func (p *GitPatcher) Prepare() error {
 		}
 		authMethod = auth
 	} else if len(p.Options.SshPrivateKey) > 0 {
-		auth, err := git.GetAuthFromSshKey([]byte(p.Options.SshPrivateKey), p.Options.SshKeyPassphrase)
+		auth, err := git.GetAuthFromSshKey([]byte(p.Options.SshPrivateKey), p.Options.SshKeyPassphrase, p.Options.NoStrictHostKeyChecking)
 		if err != nil {
 			return err
 		}
 		authMethod = auth
 	}
 
-	gitConnection, err := git.NewGitConnection(&git.GitConnectionOptions{
+	gitConnection, err := git.NewGitConnection(&git.ConnectionOptions{
 		Repository: p.Options.RepositoryUrl,
 		Branch:     p.Options.Branch,
 		Auth:       authMethod,
@@ -143,40 +148,42 @@ func (p *GitPatcher) Patch(patchTasks []PatchTask) error {
 			}
 			log.Debug("patched yaml file:\n", string(patchedData))
 
-			err = file.Truncate(0)
-			if err != nil {
-				log.WithError(err).Error("Failed to truncate file")
-				return err
-			}
-
-			_, err = file.Seek(0, 0)
-			if err != nil {
-				log.WithError(err).Error("Failed to seek file")
-				return err
-			}
-
-			_, err = file.Write(patchedData)
-			if err != nil {
-				log.Error("Failed to write file: ", err)
-				return err
-			}
-
-			hasChanges, err := p.GitConnection.HasChanges()
-			if err != nil {
-				return err
-			}
-
-			if !hasChanges {
-				log.Info("No changes detected, exiting")
-				return nil
-			}
-
-			commitHash, err := p.GitConnection.Commit([]string{filePath}, "feat(gitops): patching "+filePath)
-			if err != nil {
-				return err
-			}
-			log.Info("Created patch commit: ", commitHash.String())
+			fileContents = patchedData
 		}
+
+		err = file.Truncate(0)
+		if err != nil {
+			log.WithError(err).Error("Failed to truncate file")
+			return err
+		}
+
+		_, err = file.Seek(0, 0)
+		if err != nil {
+			log.WithError(err).Error("Failed to seek file")
+			return err
+		}
+
+		_, err = file.Write(fileContents)
+		if err != nil {
+			log.Error("Failed to write file: ", err)
+			return err
+		}
+
+		hasChanges, err := p.GitConnection.HasChanges()
+		if err != nil {
+			return err
+		}
+
+		if !hasChanges {
+			log.Info("No changes detected, exiting")
+			return nil
+		}
+
+		commitHash, err := p.GitConnection.Commit([]string{filePath}, "feat(gitops): patching "+filePath)
+		if err != nil {
+			return err
+		}
+		log.Info("Created patch commit: ", commitHash.String())
 
 	}
 

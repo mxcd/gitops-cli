@@ -32,17 +32,21 @@ export SOFT_SERVE_INITIAL_ADMIN_KEYS=$(cat $BASE/hack/soft-serve/ssh-key.pub)
 
 docker compose -f $BASE/hack/soft-serve/docker-compose.yml up -d
 
-sleep 5
+sleep 1
 
 ssh-add $BASE/hack/soft-serve/ssh-key
+echo "Creating repo"
 ssh -p 23231 -o StrictHostKeychecking=no -i $BASE/hack/soft-serve/ssh-key localhost repo create gitops-test
 
-git clone ssh://git@localhost:23231/gitops-test $BASE/hack/soft-serve/gitops-test
+echo "\nCloning repo"
+export GIT_SSH_COMMAND="ssh -o StrictHostKeychecking=no -i $BASE/hack/soft-serve/ssh-key"
+git clone ssh://localhost:23231/gitops-test.git $BASE/hack/soft-serve/gitops-test
 mkdir -p $BASE/hack/soft-serve/gitops-test/applications/dev/service-test
 cp $BASE/hack/soft-serve/fixtures/values.yaml $BASE/hack/soft-serve/gitops-test/applications/dev/service-test/values.yaml
 cd $BASE/hack/soft-serve/gitops-test
-# git add .
-# git commit -m "feat: add service-test application"
-# git push origin main
+git checkout -b main
+git add .
+git commit -m "feat: add service-test application"
+git push origin main
 
 cd $BASE/hack/soft-serve
