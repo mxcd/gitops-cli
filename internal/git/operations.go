@@ -1,103 +1,171 @@
 package git
 
 import (
-	"fmt"
-	"time"
-
-	"github.com/go-git/go-billy/v5/memfs"
-	git "github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/storage/memory"
-	log "github.com/sirupsen/logrus"
+	git2go "github.com/libgit2/git2go/v34"
 )
 
-func (c *Connection) Clone() error {
-	startTime := time.Now()
-	repo, err := git.Clone(memory.NewStorage(), memfs.New(), &git.CloneOptions{
-		URL:           c.Options.Repository,
-		Auth:          c.Options.Auth,
-		Depth:         1,
-		ReferenceName: plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", c.Options.Branch)),
-		SingleBranch:  true,
-		Tags:          git.NoTags,
-		// Progress:      os.Stdout,
-	})
-	if err != nil {
-		log.WithError(err).Error("Error cloning repository ", c.Options.Repository, " on branch ", c.Options.Branch)
-		return err
-	}
-	log.Debug("Cloned repository ", c.Options.Repository, " on branch ", c.Options.Branch, " in ", time.Since(startTime))
+type FetchOptionsUsage string
 
-	c.Repository = repo
+const (
+	FetchOptionUsageDefault FetchOptionsUsage = "default"
+)
 
-	return nil
-}
+func (c *Connection) getFetchOptions(usage FetchOptionsUsage) git2go.FetchOptions {
 
-func (c *Connection) Pull() error {
-	worktree, err := c.Repository.Worktree()
-	if err != nil {
-		log.WithError(err).Error("Error getting worktree")
-	}
+	fetchOptions := git2go.FetchOptions{}
 
-	err = worktree.Pull(&git.PullOptions{
-		RemoteName:   "origin",
-		Auth:         c.Options.Auth,
-		SingleBranch: true,
-	})
-
-	return err
-}
-
-func (c *Connection) Commit(files []string, message string) (*plumbing.Hash, error) {
-	worktree, err := c.Repository.Worktree()
-	if err != nil {
-		log.WithError(err).Error("Error getting worktree")
-		return nil, err
-	}
-
-	for _, file := range files {
-		_, err := worktree.Add(file)
-		if err != nil {
-			log.WithError(err).Error("Error 'git add'ing file")
-			return nil, err
+	switch usage {
+	case FetchOptionUsageDefault:
+		fetchOptions.RemoteCallbacks = git2go.RemoteCallbacks{
+			CredentialsCallback: c.credentialsCallback,
 		}
 	}
 
-	hash, err := worktree.Commit(message, &git.CommitOptions{})
-	if err != nil {
-		log.WithError(err).Error("Error 'git commit'ing files")
+	if c.Options.IgnoreSslHostKey {
+		fetchOptions.RemoteCallbacks.CertificateCheckCallback = func(cert *git2go.Certificate, valid bool, hostname string) error {
+			return nil
+		}
 	}
 
-	return &hash, err
+	return fetchOptions
 }
 
-func (c *Connection) Push(branch string) error {
-	err := c.Repository.Push(&git.PushOptions{
-		RemoteName: "origin",
-		Auth:       c.Options.Auth,
-	})
-	if err != nil {
-		log.WithError(err).Error("Error pushing to branch ", branch)
-		return err
-	}
+// // mustAnnotatedCommit is a helper to create an annotated commit.
+// func mustAnnotatedCommit(repo *git2go.Repository, id git2go.Oid) *git2go.AnnotatedCommit {
+// 	ann, err := repo.AnnotatedCommitLookup(&id)
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	return ann
+// }
 
-	log.Info("Pushed to origin/", branch)
+// // Commit stages the given files and creates a new commit.
+// // Returns the new commit OID on success.
+// func (c *Connection) Commit(files []string, message string) (*git2go.Oid, error) {
+// 	if c.Repository == nil {
+// 		return nil, errors.New("repository is nil, clone or open a repo first")
+// 	}
 
-	return nil
-}
+// 	index, err := c.Repository.Index()
+// 	if err != nil {
+// 		log.Error().Err(err).Msg("Error getting index")
+// 		return nil, err
+// 	}
 
-func (c *Connection) HasChanges() (bool, error) {
-	worktree, err := c.Repository.Worktree()
-	if err != nil {
-		log.WithError(err).Error("Error getting worktree")
-		return false, err
-	}
+// 	for _, file := range files {
+// 		err := index.AddByPath(file)
+// 		if err != nil {
+// 			log.Error().Err(err).Msg("Error adding file to index")
+// 			return nil, err
+// 		}
+// 	}
 
-	status, err := worktree.Status()
-	if err != nil {
-		log.WithError(err).Error("Error getting status")
-		return false, err
-	}
+// 	if err := index.Write(); err != nil {
+// 		log.Error().Err(err).Msg("Error writing index")
+// 		return nil, err
+// 	}
 
-	return !status.IsClean(), nil
-}
+// 	treeID, err := index.WriteTree()
+// 	if err != nil {
+// 		log.Error().Err(err).Msg("Error writing tree")
+// 		return nil, err
+// 	}
+
+// 	tree, err := c.Repository.LookupTree(treeID)
+// 	if err != nil {
+// 		log.Error().Err(err).Msg("Error looking up tree")
+// 		return nil, err
+// 	}
+
+// 	sig := &git2go.Signature{
+// 		Name:  "git2go-user",
+// 		Email: "example@domain",
+// 	}
+
+// 	head, err := c.Repository.Head()
+// 	if err != nil {
+// 		log.Error().Err(err).Msg("Error getting HEAD")
+// 		return nil, err
+// 	}
+
+// 	parent, err := c.Repository.LookupCommit(head.Target())
+// 	if err != nil {
+// 		log.Error().Err(err).Msg("Error looking up HEAD commit")
+// 		return nil, err
+// 	}
+
+// 	commitID, err := c.Repository.CreateCommit(head.Name(), sig, sig, message, tree, parent)
+// 	if err != nil {
+// 		log.Error().Err(err).Msg("Error creating commit")
+// 		return nil, err
+// 	}
+
+// 	return commitID, nil
+// }
+
+// // Push attempts to push the given branch to origin.
+// func (c *Connection) Push(branch string) error {
+// 	if c.Repository == nil {
+// 		return errors.New("repository is nil, clone or open a repo first")
+// 	}
+
+// 	remote, err := c.Repository.Remotes.Lookup("origin")
+// 	if err != nil {
+// 		log.Error().Err(err).Msg("Error looking up remote 'origin'")
+// 		return err
+// 	}
+
+// 	refSpec := fmt.Sprintf("refs/heads/%s:refs/heads/%s", branch, branch)
+
+// 	pushOpts := &git2go.PushOptions{
+// 		RemoteCallbacks: git2go.RemoteCallbacks{
+// 			CredentialsCallback: c.credentialsCallback,
+// 		},
+// 	}
+
+// 	err = remote.Push([]string{refSpec}, pushOpts)
+// 	if err != nil {
+// 		log.Error().Err(err).Msgf("Error pushing to branch %s", branch)
+// 		return err
+// 	}
+
+// 	log.Info().Msgf("Pushed to origin/%s", branch)
+// 	return nil
+// }
+
+// // HasChanges checks whether the index differs from HEAD.
+// func (c *Connection) HasChanges() (bool, error) {
+// 	if c.Repository == nil {
+// 		return false, errors.New("repository is nil, clone or open a repo first")
+// 	}
+
+// 	head, err := c.Repository.Head()
+// 	if err != nil {
+// 		log.Error().Err(err).Msg("Error getting HEAD")
+// 		return false, err
+// 	}
+
+// 	headCommit, err := c.Repository.LookupCommit(head.Target())
+// 	if err != nil {
+// 		log.Error().Err(err).Msg("Error looking up HEAD commit")
+// 		return false, err
+// 	}
+
+// 	headTree, err := headCommit.Tree()
+// 	if err != nil {
+// 		log.Error().Err(err).Msg("Error getting HEAD tree")
+// 		return false, err
+// 	}
+
+// 	index, err := c.Repository.Index()
+// 	if err != nil {
+// 		return false, err
+// 	}
+
+// 	diff, err := c.Repository.DiffTreeToIndex(headTree, index, nil)
+// 	if err != nil {
+// 		return false, err
+// 	}
+
+// 	return diff.NumDeltas() > 0, nil
+// }

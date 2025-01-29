@@ -17,5 +17,9 @@ func (s *Server) getPatchHandler() gin.HandlerFunc {
 			c.JSON(400, gin.H{"error": "invalid input"})
 			return
 		}
+
+		
+
+		c.JSON(200, gin.H{"message": "ok"})
 	}
 }
