@@ -3,7 +3,7 @@ package server
 import "github.com/gin-gonic/gin"
 
 func (s *Server) registerHealthRoute() error {
-	s.Engine.GET(s.Config.ApiBaseUrl+"/health", s.getHealthHandler())
+	s.Engine.GET(s.Options.ApiBaseUrl+"/health", s.getHealthHandler())
 	return nil
 }
 

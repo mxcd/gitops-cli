@@ -77,21 +77,36 @@ func (c *Connection) performPullAction() error {
 		return fmt.Errorf("error looking up remote branch: %w", err)
 	}
 
-	isAncestor, err := c.Repository.DescendantOf(remoteBranch.Target(), localBranch.Target())
+	// If both branches are equal, nothing to do.
+	if localBranch.Target().Equal(remoteBranch.Target()) {
+		log.Debug().Msg("nothing to pull. already up to date")
+		return nil
+	}
+
+	// Check if local branch is ahead of remote.
+	isLocalAhead, err := c.Repository.DescendantOf(localBranch.Target(), remoteBranch.Target())
+	if err != nil {
+		return fmt.Errorf("error checking if local is ahead of remote: %w", err)
+	}
+	if isLocalAhead {
+		log.Debug().Msg("local branch is ahead of remote; nothing to pull")
+		return nil
+	}
+
+	// Check if remote is ahead of local (i.e. fast-forward is possible).
+	isRemoteAhead, err := c.Repository.DescendantOf(remoteBranch.Target(), localBranch.Target())
 	if err != nil {
 		return fmt.Errorf("error checking if fast-forward is possible: %w", err)
 	}
+	log.Debug().Bool("isRemoteAhead", isRemoteAhead).Msg("Checking if fast-forward is possible")
 
-	log.Debug().Bool("isAncestor", isAncestor).Msg("Checking if fast-forward is possible")
-
-	if isAncestor {
+	if isRemoteAhead {
 		return c.fastForward(localBranch, remoteBranch)
-	} else if c.Options.PullRebase {
-		return c.rebase(localBranch, remoteBranch)
 	} else {
-		return c.merge(remoteBranch)
+		return c.rebase(localBranch, remoteBranch)
 	}
 }
+
 
 func (c *Connection) fastForward(localBranch, remoteBranch *git2go.Reference) error {
 	_, err := localBranch.SetTarget(remoteBranch.Target(), "Fast-forward")
@@ -136,7 +151,7 @@ func (c *Connection) rebase(localBranch, remoteBranch *git2go.Reference) error {
 				When:  time.Now(),
 			}
 
-      var commitId git2go.Oid
+			var commitId git2go.Oid
 			err = rebase.Commit(&commitId, signature, signature, "rebased")
 			if err != nil {
 				return fmt.Errorf("error committing during rebase: %w", err)
@@ -159,65 +174,5 @@ func (c *Connection) rebase(localBranch, remoteBranch *git2go.Reference) error {
 	}
 
 	log.Debug().Msg("Rebase completed successfully.")
-	return nil
-}
-
-func (c *Connection) merge(remoteBranch *git2go.Reference) error {
-	remoteAnnotatedCommit, err := c.Repository.AnnotatedCommitFromRef(remoteBranch)
-	if err != nil {
-		return fmt.Errorf("error creating annotated commit for remote branch: %w", err)
-	}
-
-	err = c.Repository.Merge([]*git2go.AnnotatedCommit{remoteAnnotatedCommit}, nil, nil)
-	if err != nil {
-		return fmt.Errorf("error performing merge: %w", err)
-	}
-
-	index, err := c.Repository.Index()
-	if err != nil {
-		return fmt.Errorf("error getting repository index: %w", err)
-	}
-
-	if index.HasConflicts() {
-		return fmt.Errorf("merge conflicts detected; manual resolution required")
-	}
-
-	sig := &git2go.Signature{
-		Name:  c.Options.Signature.Name,
-		Email: c.Options.Signature.Email,
-		When:  time.Now(),
-	}
-
-	treeID, err := index.WriteTree()
-	if err != nil {
-		return fmt.Errorf("error writing tree from index: %w", err)
-	}
-
-	tree, err := c.Repository.LookupTree(treeID)
-	if err != nil {
-		return fmt.Errorf("error looking up tree: %w", err)
-	}
-
-	headRef, err := c.Repository.Head()
-	if err != nil {
-		return fmt.Errorf("error getting HEAD reference: %w", err)
-	}
-
-	parentCommit, err := c.Repository.LookupCommit(headRef.Target())
-	if err != nil {
-		return fmt.Errorf("error looking up HEAD commit: %w", err)
-	}
-
-	_, err = c.Repository.CreateCommit("HEAD", sig, sig, "Merge branch '"+c.Options.Branch+"' into HEAD", tree, parentCommit)
-	if err != nil {
-		return fmt.Errorf("error creating merge commit: %w", err)
-	}
-
-	err = c.Repository.StateCleanup()
-	if err != nil {
-		return fmt.Errorf("error cleaning up merge state: %w", err)
-	}
-
-	log.Debug().Msg("Merge completed successfully.")
 	return nil
 }

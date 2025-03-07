@@ -37,7 +37,7 @@ func (c *Connection) Clone() error {
 		return err
 	}
 
-	log.Debug().Msgf("Cloned repository %s on branch %s in %d", c.Options.Repository, c.Options.Branch, time.Since(startTime))
+	log.Debug().Msgf("Cloned repository %s on branch %s in %d ms", c.Options.Repository, c.Options.Branch, time.Since(startTime).Milliseconds())
 	c.Repository = repo
 
 	err = repo.CheckoutHead(&git2go.CheckoutOptions{

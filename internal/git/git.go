@@ -2,10 +2,12 @@ package git
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
 	git2go "github.com/libgit2/git2go/v34"
+	"github.com/rs/zerolog/log"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -16,7 +18,6 @@ type ConnectionOptions struct {
 	Branch           string
 	Authentication   *Authentication
 	IgnoreSslHostKey bool
-	PullRebase       bool
 	Signature        *Signature
 }
 
@@ -123,7 +124,7 @@ func GetAuthFromSshKey(sshKey []byte, sshKeyPassphrase *string) (*Authentication
 	}, nil
 }
 
-func (c *Connection) credentialsCallback(url string, usernameFromURL string, allowedTypes git2go.CredentialType) (*git2go.Cred, error) {
+func (c *Connection) credentialsCallback(url string, usernameFromURL string, allowedTypes git2go.CredentialType) (*git2go.Credential, error) {
 
 	if c.Options.Authentication == nil {
 		return git2go.NewCredentialDefault()
@@ -138,4 +139,39 @@ func (c *Connection) credentialsCallback(url string, usernameFromURL string, all
 	}
 
 	return git2go.NewCredentialDefault()
+}
+
+func (c *Connection) HasChanges() (bool, error) {
+	if c.Repository == nil {
+		return false, fmt.Errorf("repository is not initialized")
+	}
+
+	index, err := c.Repository.Index()
+	if err != nil {
+		return false, fmt.Errorf("error accessing repository index: %w", err)
+	}
+
+	if index.EntryCount() > 0 {
+		log.Debug().Msg("Staged changes detected")
+		return true, nil
+	}
+
+	statusList, err := c.Repository.StatusList(&git2go.StatusOptions{
+		Show:  git2go.StatusShowIndexAndWorkdir,
+		Flags: git2go.StatusOptIncludeUntracked,
+	})
+	if err != nil {
+		return false, fmt.Errorf("error retrieving repository status: %w", err)
+	}
+	defer statusList.Free()
+
+	statusCount, err := statusList.EntryCount()
+	if err != nil {
+		return false, fmt.Errorf("error getting status entry count: %w", err)
+	}
+
+	hasChanges := statusCount > 0
+	log.Debug().Bool("hasChanges", hasChanges).Msg("Checked repository status")
+
+	return hasChanges, nil
 }

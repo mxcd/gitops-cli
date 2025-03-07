@@ -13,6 +13,8 @@ hack/soft-serve/ssh-key.pub
 
 .vscode/launch.json
 
+.env
+
 # Ignore "main" binary
 main
 # Ignore "gitops" binary

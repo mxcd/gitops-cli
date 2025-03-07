@@ -1,0 +1,29 @@
+meta {
+  name: patch field
+  type: http
+  seq: 3
+}
+
+put {
+  url: http://localhost:8080/api/v1/patch
+  body: json
+  auth: apikey
+}
+
+auth:apikey {
+  key: X-API-Key
+  value: test
+  placement: header
+}
+
+body:json {
+  {
+    "filePath": "applications/dev/service-test/values.yaml",
+    "patches": [
+      {
+        "selector": ".service.image.tag",
+        "value": "new-image-tag"
+      }
+    ]
+  }
+}

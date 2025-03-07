@@ -7,17 +7,21 @@ import (
 )
 
 type PatchTask struct {
-	FilePath string
-	Patches  []Patch
+	FilePath string  `json:"filePath"`
+	Patches  []Patch `json:"patches"`
 }
 
 type Patch struct {
-	Selector string
-	Value    string
+	Selector string `json:"selector"`
+	Value    string `json:"value"`
+}
+
+type PrepareOptions struct {
+	Clone bool
 }
 
 type PatchMethod interface {
-	Prepare() error
+	Prepare(options *PrepareOptions) error
 	Patch(patchTasks []PatchTask) error
 }
 
@@ -25,7 +29,7 @@ func PatchCommand(c *cli.Context) error {
 
 	var patchMethod PatchMethod
 
-	if c.String("repo") != "" {
+	if c.String("repository") != "" {
 		patcherOptions, err := GetGitPatcherOptionsFromCli(c)
 		if err != nil {
 			return err
@@ -37,13 +41,17 @@ func PatchCommand(c *cli.Context) error {
 		}
 
 		patchMethod = patcher
-	} else if c.String("repo-server") != "" {
-		// return PatchMethodRepoServer(c)
+	} else if c.String("repository-server") != "" {
+		method, err := NewRepoServerPatcher(c)
+		if err != nil {
+			return err
+		}
+		patchMethod = method
 	} else {
 		return errors.New("no repository specified")
 	}
 
-	err := patchMethod.Prepare()
+	err := patchMethod.Prepare(&PrepareOptions{Clone: true})
 	if err != nil {
 		return err
 	}

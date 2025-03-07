@@ -51,7 +51,7 @@ func TestNewGitConnection(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func cloneTempRepository(t *testing.T, pullRebase bool) *Connection {
+func cloneTempRepository(t *testing.T) *Connection {
 	sshKey := getSshKeyData(t)
 
 	baseDir, err := util.GetGitRepoRoot()
@@ -69,7 +69,6 @@ func cloneTempRepository(t *testing.T, pullRebase bool) *Connection {
 		Repository:     "ssh://git@localhost:23231/gitops-test.git",
 		Branch:         "main",
 		Authentication: authentication,
-		PullRebase:     pullRebase,
 	}
 	gitConnection, err := NewGitConnection(options)
 	assert.NoError(t, err)
@@ -83,11 +82,11 @@ func cloneTempRepository(t *testing.T, pullRebase bool) *Connection {
 
 func TestGitPullFastForward(t *testing.T) {
 
-	tempConnectionA := cloneTempRepository(t, false)
+	tempConnectionA := cloneTempRepository(t)
 	assert.NotNil(t, tempConnectionA)
 	log.Println("tempConnectionA cloned")
 
-	tempConnectionB := cloneTempRepository(t, false)
+	tempConnectionB := cloneTempRepository(t)
 	assert.NotNil(t, tempConnectionB)
 	log.Println("tempConnectionB cloned")
 
@@ -120,12 +119,12 @@ func TestGitPullFastForward(t *testing.T) {
 func TestGitPullRebase(t *testing.T) {
 
 	// Clone repository A
-	tempConnectionA := cloneTempRepository(t, true)
+	tempConnectionA := cloneTempRepository(t)
 	assert.NotNil(t, tempConnectionA)
 	log.Println("tempConnectionA cloned")
 
 	// Clone repository B
-	tempConnectionB := cloneTempRepository(t, true)
+	tempConnectionB := cloneTempRepository(t)
 	assert.NotNil(t, tempConnectionB)
 	log.Println("tempConnectionB cloned")
 

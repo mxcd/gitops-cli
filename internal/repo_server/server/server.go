@@ -6,10 +6,10 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mxcd/gitops-cli/internal/git"
+	"github.com/mxcd/gitops-cli/internal/patch"
 )
 
-type RouterConfig struct {
+type RouterOptions struct {
 	DevMode    bool
 	Port       int
 	ApiBaseUrl string
@@ -19,22 +19,24 @@ type RouterConfig struct {
 type Server struct {
 	Engine     *gin.Engine
 	HttpServer *http.Server
-	Config     *RouterConfig
+	Options    *RouterOptions
+	GitPatcher *patch.GitPatcher
 }
 
-func NewServer(config *RouterConfig, gitConnection *git.Connection) (*Server, error) {
-	if !config.DevMode {
+func NewServer(options *RouterOptions, gitPatcher *patch.GitPatcher) (*Server, error) {
+	if !options.DevMode {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
 	engine := gin.New()
 	router := &Server{
-		Config: config,
-		Engine: engine,
+		Options: options,
+		Engine:  engine,
 		HttpServer: &http.Server{
-			Addr:    fmt.Sprintf(":%d", config.Port),
+			Addr:    fmt.Sprintf(":%d", options.Port),
 			Handler: engine,
 		},
+		GitPatcher: gitPatcher,
 	}
 
 	return router, nil
@@ -42,7 +44,10 @@ func NewServer(config *RouterConfig, gitConnection *git.Connection) (*Server, er
 
 func (s *Server) RegisterMiddlewares() {
 	apiKeyAuthMiddleware := GetApiKeyAuthMiddleware(&ApiKeyAuthMiddlewareConfig{
-		AllowedApiKeys: s.Config.ApiKeys,
+		AllowedApiKeys: s.Options.ApiKeys,
+		UnprotectedRoutes: []string{
+			s.Options.ApiBaseUrl + "/health",
+		},
 	})
 	s.Engine.Use(apiKeyAuthMiddleware)
 }

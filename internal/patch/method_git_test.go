@@ -5,6 +5,8 @@ import (
 	"path"
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/mxcd/gitops-cli/internal/git"
 	"github.com/mxcd/gitops-cli/internal/util"
 	"github.com/stretchr/testify/assert"
 )
@@ -26,18 +28,34 @@ func getSshKeyData(t *testing.T) []byte {
 
 func TestGitSshPatch(t *testing.T) {
 	sshKey := getSshKeyData(t)
-
-	options := &GitPatcherOptions{
-		Branch:                  "main",
-		RepositoryUrl:           "ssh://localhost:23231/gitops-test.git",
-		SshPrivateKey:           sshKey,
-		NoStrictHostKeyChecking: true,
-	}
-
-	patcher, err := NewGitPatcher(options)
+	baseDir, err := util.GetGitRepoRoot()
 	assert.NoError(t, err)
 
-	err = patcher.Prepare()
+	uuidA := uuid.New().String()
+	repositoryPathA := path.Join(baseDir, "sandbox", uuidA)
+	err = os.MkdirAll(repositoryPathA, 0755)
+	assert.NoError(t, err)
+
+	gitConnectionOptionsA := &git.ConnectionOptions{
+		Repository:       "ssh://localhost:23231/gitops-test.git",
+		Directory:        repositoryPathA,
+		Branch:           "main",
+		IgnoreSslHostKey: true,
+		Authentication: &git.Authentication{
+			SshKey: &git.SshKey{
+				PrivateKey: sshKey,
+			},
+		},
+	}
+
+	patcher, err := NewGitPatcher(&GitPatcherOptions{
+		GitConnectionOptions: gitConnectionOptionsA,
+	})
+	assert.NoError(t, err)
+
+	err = patcher.Prepare(&PrepareOptions{
+		Clone: true,
+	})
 	assert.NoError(t, err)
 
 	patchTask := PatchTask{
@@ -53,3 +71,6 @@ func TestGitSshPatch(t *testing.T) {
 	err = patcher.Patch([]PatchTask{patchTask})
 	assert.NoError(t, err)
 }
+
+// Simple Patch
+// Patch with existing cloned repo

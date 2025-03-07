@@ -13,13 +13,13 @@ func InitConfig() error {
 
 		config.String("GITOPS_REPOSITORY").NotEmpty(),
 		config.String("GITOPS_REPOSITORY_BRANCH").NotEmpty().Default("main"),
-		config.Bool("GITOPS_REPOSITORY_NO_STRICT_HOST_KEY_CHECKING").Default(false),
+		config.Bool("GITOPS_REPOSITORY_IGNORE_SSL_HOSTKEY").Default(false),
 		config.String("GITOPS_REPOSITORY_HOST_KEY").Default(""),
 
-		config.String("GITOPS_REPOSITORY_BASICAUTH").Sensitive(),
-		config.String("GITOPS_REPOSITORY_SSH_KEY").Sensitive(),
-		config.String("GITOPS_REPOSITORY_SSH_KEY_FILE").Sensitive(),
-		config.String("GITOPS_REPOSITORY_SSH_KEY_PASSPHRASE").Sensitive(),
+		config.String("GITOPS_REPOSITORY_BASICAUTH").Sensitive().Default(""),
+		config.String("GITOPS_REPOSITORY_SSH_KEY").Sensitive().Default(""),
+		config.String("GITOPS_REPOSITORY_SSH_KEY_FILE").Sensitive().Default(""),
+		config.String("GITOPS_REPOSITORY_SSH_KEY_PASSPHRASE").Sensitive().Default(""),
 
 		config.StringArray("API_KEYS").NotEmpty().Sensitive(),
 	})
