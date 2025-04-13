@@ -3,10 +3,13 @@ package patch
 import (
 	"errors"
 
+	log "github.com/rs/zerolog/log"
+
 	"github.com/urfave/cli/v2"
 )
 
 type PatchTask struct {
+	Actor    string  `json:"actor"`
 	FilePath string  `json:"filePath"`
 	Patches  []Patch `json:"patches"`
 }
@@ -30,17 +33,18 @@ func PatchCommand(c *cli.Context) error {
 	var patchMethod PatchMethod
 
 	if c.String("repository") != "" {
-		patcherOptions, err := GetGitPatcherOptionsFromCli(c)
-		if err != nil {
-			return err
-		}
+		// patcherOptions, err := GetGitPatcherOptionsFromCli(c)
+		// if err != nil {
+		// 	return err
+		// }
 
-		patcher, err := NewGitPatcher(patcherOptions)
-		if err != nil {
-			return err
-		}
+		// patcher, err := NewGitPatcher(patcherOptions)
+		// if err != nil {
+		// 	return err
+		// }
 
-		patchMethod = patcher
+		// patchMethod = patcher
+		log.Panic().Msg("Git patcher not implemented")
 	} else if c.String("repository-server") != "" {
 		method, err := NewRepoServerPatcher(c)
 		if err != nil {
@@ -75,6 +79,15 @@ func GetPatchTaskFromCli(c *cli.Context) (PatchTask, error) {
 		return PatchTask{}, errors.New("no file specified")
 	}
 
+	actor := ""
+
+	if c.String("actor") != "" {
+		cliActor := c.String("actor")
+		if cliActor != "" {
+			actor = cliActor
+		}
+	}
+
 	patches := []Patch{}
 	args := c.Args().Tail()
 
@@ -90,6 +103,7 @@ func GetPatchTaskFromCli(c *cli.Context) (PatchTask, error) {
 	}
 
 	return PatchTask{
+		Actor:    actor,
 		FilePath: filePath,
 		Patches:  patches,
 	}, nil

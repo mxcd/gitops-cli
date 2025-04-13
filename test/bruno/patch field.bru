@@ -18,11 +18,11 @@ auth:apikey {
 
 body:json {
   {
-    "filePath": "applications/dev/service-test/values.yaml",
+    "filePath": "applications/dev/service-foo/values.yaml",
     "patches": [
       {
         "selector": ".service.image.tag",
-        "value": "new-image-tag"
+        "value": "v1.1.1"
       }
     ]
   }

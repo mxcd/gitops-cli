@@ -92,7 +92,6 @@ func (p *GitPatcher) Prepare(options *PrepareOptions) error {
 	if p.Options.GitConnection != nil {
 		p.GitConnection = p.Options.GitConnection
 	} else {
-
 		gitConnection, err := git.NewGitConnection(p.Options.GitConnectionOptions)
 		if err != nil {
 			return err
@@ -165,12 +164,17 @@ func (p *GitPatcher) Patch(patchTasks []PatchTask) error {
 			return nil
 		}
 
-		commitHash, err := p.GitConnection.Commit([]string{relativeFilePath}, fmt.Sprintf("feat(gitops): patching %s", relativeFilePath))
+		commitFooter := ""
+
+		if patchTask.Actor != "" {
+			commitFooter = fmt.Sprintf("\n\nTriggered by: %s", patchTask.Actor)
+		}
+
+		commitHash, err := p.GitConnection.Commit([]string{relativeFilePath}, fmt.Sprintf("feat(gitops): patching %s%s", relativeFilePath, commitFooter))
 		if err != nil {
 			return err
 		}
 		log.Info().Msgf("Created patch commit: %s", commitHash)
-
 	}
 
 	executePush := func() error {

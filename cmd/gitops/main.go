@@ -259,6 +259,12 @@ func main() {
 						Usage:   "SSH key passphrase for authenticating against the GitOps repository",
 						EnvVars: []string{"GITOPS_REPOSITORY_SSH_KEY_PASSPHRASE"},
 					},
+					&cli.StringFlag{
+						Name:    "actor",
+						Value:   "",
+						Usage:   "Username of the actor to be used for the commit",
+						EnvVars: []string{"GITOPS_ACTOR"},
+					},
 				},
 				Action: func(c *cli.Context) error {
 					initApplication(c)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"time"
 
 	"github.com/rs/zerolog/log"
 
@@ -27,11 +28,14 @@ func main() {
 	if err != nil {
 		log.Panic().Err(err).Msg("error initializing git connection")
 	}
+	log.Info().Msg("Cloning git repository")
+	startTime := time.Now()
 
 	err = gitConnection.Clone()
 	if err != nil {
 		log.Panic().Err(err).Msg("error cloning git repository")
 	}
+	log.Info().Msgf("Cloned git repository in %s", time.Since(startTime))
 
 	gitPatcher, err := patch.NewGitPatcher(&patch.GitPatcherOptions{
 		GitConnection: gitConnection,
@@ -59,6 +63,7 @@ func main() {
 	server.RegisterMiddlewares()
 	server.RegisterRoutes()
 
+	log.Info().Msgf("Starting server on port %d", config.Get().Int("PORT"))
 	err = server.Run()
 	if err != nil {
 		log.Panic().Err(err).Msg("error running server")

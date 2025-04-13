@@ -67,7 +67,7 @@ func NewGitConnection(options *ConnectionOptions) (*Connection, error) {
 
 	if options.Signature == nil {
 		connection.Options.Signature = &Signature{
-			Name:  "GitOps CI User",
+			Name:  "GitOps CLI CI User",
 			Email: "gitops@example.com",
 		}
 	} else {

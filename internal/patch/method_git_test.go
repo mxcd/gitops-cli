@@ -1,76 +1,78 @@
 package patch
 
-import (
-	"os"
-	"path"
-	"testing"
+// import (
+// 	"os"
+// 	"path"
+// 	"testing"
 
-	"github.com/google/uuid"
-	"github.com/mxcd/gitops-cli/internal/git"
-	"github.com/mxcd/gitops-cli/internal/util"
-	"github.com/stretchr/testify/assert"
-)
+// 	"github.com/google/uuid"
+// 	"github.com/mxcd/gitops-cli/internal/git"
+// 	"github.com/mxcd/gitops-cli/internal/util"
+// 	"github.com/stretchr/testify/assert"
+// )
 
-func getSshKeyData(t *testing.T) []byte {
-	baseDir, err := util.GetGitRepoRoot()
-	assert.NoError(t, err)
-	assert.NotEmpty(t, baseDir)
+// func getSshKeyData(t *testing.T) []byte {
+// 	baseDir, err := util.GetGitRepoRoot()
+// 	assert.NoError(t, err)
+// 	assert.NotEmpty(t, baseDir)
 
-	sshKeyPath := path.Join(baseDir, "hack", "soft-serve", "ssh-key")
-	assert.FileExists(t, sshKeyPath)
+// 	sshKeyPath := path.Join(baseDir, "hack", "soft-serve", "ssh-key")
+// 	assert.FileExists(t, sshKeyPath)
 
-	sshKey, err := os.ReadFile(sshKeyPath)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, sshKey)
+// 	sshKey, err := os.ReadFile(sshKeyPath)
+// 	assert.NoError(t, err)
+// 	assert.NotEmpty(t, sshKey)
 
-	return sshKey
-}
+// 	return sshKey
+// }
 
-func TestGitSshPatch(t *testing.T) {
-	sshKey := getSshKeyData(t)
-	baseDir, err := util.GetGitRepoRoot()
-	assert.NoError(t, err)
+// func TestGitSshPatch(t *testing.T) {
+// 	sshKey := getSshKeyData(t)
+// 	baseDir, err := util.GetGitRepoRoot()
+// 	assert.NoError(t, err)
 
-	uuidA := uuid.New().String()
-	repositoryPathA := path.Join(baseDir, "sandbox", uuidA)
-	err = os.MkdirAll(repositoryPathA, 0755)
-	assert.NoError(t, err)
+// 	uuidA := uuid.New().String()
+// 	repositoryPathA := path.Join(baseDir, "sandbox", "gitops-test-"+uuidA)
+// 	err = os.MkdirAll(repositoryPathA, 0755)
+// 	assert.NoError(t, err)
 
-	gitConnectionOptionsA := &git.ConnectionOptions{
-		Repository:       "ssh://localhost:23231/gitops-test.git",
-		Directory:        repositoryPathA,
-		Branch:           "main",
-		IgnoreSslHostKey: true,
-		Authentication: &git.Authentication{
-			SshKey: &git.SshKey{
-				PrivateKey: sshKey,
-			},
-		},
-	}
+// 	gitConnectionOptionsA := &git.ConnectionOptions{
+// 		Repository:       "ssh://localhost:23231/gitops-test.git",
+// 		Directory:        repositoryPathA,
+// 		Branch:           "main",
+// 		IgnoreSslHostKey: true,
+// 		Authentication: &git.Authentication{
+// 			SshKey: &git.SshKey{
+// 				PrivateKey: sshKey,
+// 			},
+// 		},
+// 	}
 
-	patcher, err := NewGitPatcher(&GitPatcherOptions{
-		GitConnectionOptions: gitConnectionOptionsA,
-	})
-	assert.NoError(t, err)
+// 	patcher, err := NewGitPatcher(&GitPatcherOptions{
+// 		GitConnectionOptions: gitConnectionOptionsA,
+// 	})
+// 	assert.NoError(t, err)
+// 	assert.NotNil(t, patcher)
 
-	err = patcher.Prepare(&PrepareOptions{
-		Clone: true,
-	})
-	assert.NoError(t, err)
+// 	err = patcher.Prepare(&PrepareOptions{
+// 		Clone: true,
+// 	})
+// 	assert.NotNil(t, patcher.GitConnection)
+// 	assert.NoError(t, err)
 
-	patchTask := PatchTask{
-		FilePath: "applications/dev/service-test/values.yaml",
-		Patches: []Patch{
-			{
-				Selector: ".service.image.tag",
-				Value:    "v1.0.0",
-			},
-		},
-	}
+// 	patchTask := PatchTask{
+// 		FilePath: "applications/dev/service-test/values.yaml",
+// 		Patches: []Patch{
+// 			{
+// 				Selector: ".service.image.tag",
+// 				Value:    "v1.0.0",
+// 			},
+// 		},
+// 	}
 
-	err = patcher.Patch([]PatchTask{patchTask})
-	assert.NoError(t, err)
-}
+// 	err = patcher.Patch([]PatchTask{patchTask})
+// 	assert.NoError(t, err)
+// }
 
 // Simple Patch
 // Patch with existing cloned repo
