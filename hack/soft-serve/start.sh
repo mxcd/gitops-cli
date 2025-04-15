@@ -30,6 +30,9 @@ ssh-keygen -t ed25519 -N '' -f $BASE/hack/soft-serve/ssh-key
 # set config vars
 export SOFT_SERVE_INITIAL_ADMIN_KEYS=$(cat $BASE/hack/soft-serve/ssh-key.pub)
 
+mkdir -p $BASE/hack/soft-serve/data
+chmod 700 $BASE/hack/soft-serve/data
+
 docker compose -f $BASE/hack/soft-serve/docker-compose.yml up -d
 
 sleep 1
