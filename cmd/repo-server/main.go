@@ -106,6 +106,6 @@ func getGitConnectionOptions() *git.ConnectionOptions {
 		Branch:           config.Get().String("GITOPS_REPOSITORY_BRANCH"),
 		Repository:       config.Get().String("GITOPS_REPOSITORY"),
 		Authentication:   authentication,
-		IgnoreSslHostKey: config.Get().Bool("GITOPS_REPOSITORY_IGNORE_SSL_HOSTKEY"),
+		IgnoreSshHostKey: config.Get().Bool("GITOPS_REPOSITORY_IGNORE_SSL_HOSTKEY"),
 	}
 }

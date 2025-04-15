@@ -2,92 +2,75 @@ package git
 
 import (
 	"fmt"
-	"time"
 
-	git2go "github.com/libgit2/git2go/v34"
-
+	"github.com/ldez/go-git-cmd-wrapper/v2/add"
+	"github.com/ldez/go-git-cmd-wrapper/v2/commit"
+	"github.com/ldez/go-git-cmd-wrapper/v2/config"
+	"github.com/ldez/go-git-cmd-wrapper/v2/git"
+	"github.com/ldez/go-git-cmd-wrapper/v2/revparse"
+	"github.com/ldez/go-git-cmd-wrapper/v2/types"
 	"github.com/rs/zerolog/log"
 )
 
 func (c *Connection) Commit(files []string, message string) (string, error) {
-	if c.Repository == nil {
-		return "", fmt.Errorf("repository is not initialized")
+	directory := c.Options.Directory
+	if directory == "" {
+		return "", fmt.Errorf("directory is not specified")
 	}
 
-	// Get the index for staging changes
-	index, err := c.Repository.Index()
+	msg, err := git.Add(runGitIn(directory), add.PathSpec(files...))
 	if err != nil {
-		log.Error().Err(err).Msg("Error accessing repository index")
-		return "", fmt.Errorf("error accessing repository index: %w", err)
+		log.Error().Err(err).Str("output", msg).Msg("Failed to add files")
+		return "", err
 	}
 
-	// Add specified files to the index
-	for _, file := range files {
-		err = index.AddByPath(file)
-		if err != nil {
-			log.Error().Err(err).Str("file", file).Msg("Error adding file to index")
-			return "", fmt.Errorf("error adding file to index: %w", err)
-		}
-	}
-
-	// Write the index to the repository's staging area
-	err = index.Write()
+	msg, err = git.Config(config.Entry("user.name", c.Options.Signature.Name), runGitIn(directory))
 	if err != nil {
-		log.Error().Err(err).Msg("Error writing index to repository")
-		return "", fmt.Errorf("error writing index to repository: %w", err)
+		log.Error().Err(err).Str("output", msg).Msg("Failed to set user.name")
+		return "", err
 	}
 
-	treeID, err := index.WriteTree()
+	msg, err = git.Config(config.Entry("user.email", c.Options.Signature.Email), runGitIn(directory))
 	if err != nil {
-		log.Error().Err(err).Msg("Error writing tree from index")
-		return "", fmt.Errorf("error writing tree from index: %w", err)
+		log.Error().Err(err).Str("output", msg).Msg("Failed to set user.email")
+		return "", err
 	}
 
-	// Lookup the tree object
-	tree, err := c.Repository.LookupTree(treeID)
+	msg, err = git.Commit(runGitIn(directory), commit.Message(message))
 	if err != nil {
-		log.Error().Err(err).Msg("Error looking up tree object")
-		return "", fmt.Errorf("error looking up tree object: %w", err)
+		log.Error().Err(err).Str("output", msg).Msg("Failed to commit")
+		return "", err
 	}
 
-	// Get the HEAD commit for parent
-	headRef, err := c.Repository.Head()
+	currentCommitId, err := git.RevParse(runGitIn(directory), revparse.Args("HEAD"))
 	if err != nil {
-		log.Error().Err(err).Msg("Error retrieving HEAD reference")
-		return "", fmt.Errorf("error retrieving HEAD reference: %w", err)
+		log.Error().Err(err).Str("output", currentCommitId).Msg("Failed to get current commit ID")
+		return "", err
 	}
 
-	var parentCommit *git2go.Commit
-	if headRef != nil && headRef.Target() != nil {
-		parentCommit, err = c.Repository.LookupCommit(headRef.Target())
-		if err != nil {
-			log.Error().Err(err).Msg("Error looking up HEAD commit")
-			return "", fmt.Errorf("error looking up HEAD commit: %w", err)
-		}
+	return currentCommitId, nil
+}
+
+func (c *Connection) HasChanges() (bool, error) {
+	directory := c.Options.Directory
+	if directory == "" {
+		return false, fmt.Errorf("directory is not specified")
 	}
 
-	sig := &git2go.Signature{
-		Name:  c.Options.Signature.Name,
-		Email: c.Options.Signature.Email,
-		When:  time.Now(),
-	}
-
-	var commitID *git2go.Oid
-	if parentCommit != nil {
-		commitID, err = c.Repository.CreateCommit(
-			"HEAD", sig, sig, message, tree, parentCommit,
-		)
-	} else {
-		commitID, err = c.Repository.CreateCommit(
-			"HEAD", sig, sig, message, tree,
-		)
-	}
-
+	msg, err := git.Raw("update-index", runGitIn(directory), func(g *types.Cmd) {
+		g.AddOptions("--refresh")
+	})
 	if err != nil {
-		log.Error().Err(err).Msg("Error creating commit")
-		return "", fmt.Errorf("error creating commit: %w", err)
+		log.Error().Err(err).Str("output", msg).Msg("Failed to refresh index")
+		return false, err
 	}
 
-	log.Debug().Str("commit", commitID.String()).Msg("Commit created successfully")
-	return commitID.String(), nil
+	_, err = git.Raw("diff-files", runGitIn(directory), func(g *types.Cmd) {
+		g.AddOptions("--quiet")
+	})
+	if err != nil {
+		return true, nil
+	}
+
+	return false, nil
 }

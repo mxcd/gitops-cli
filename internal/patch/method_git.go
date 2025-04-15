@@ -154,6 +154,7 @@ func (p *GitPatcher) Patch(patchTasks []PatchTask) error {
 			return err
 		}
 
+		log.Debug().Msg("checking for changes")
 		hasChanges, err := p.GitConnection.HasChanges()
 		if err != nil {
 			return err
@@ -162,6 +163,8 @@ func (p *GitPatcher) Patch(patchTasks []PatchTask) error {
 		if !hasChanges {
 			log.Info().Msg("No changes detected, exiting")
 			return nil
+		} else {
+			log.Debug().Msg("Changes detected, committing")
 		}
 
 		commitFooter := ""

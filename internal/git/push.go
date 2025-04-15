@@ -2,37 +2,41 @@ package git
 
 import (
 	"fmt"
+	"time"
 
-	git2go "github.com/libgit2/git2go/v34"
-
+	"github.com/ldez/go-git-cmd-wrapper/v2/git"
+	"github.com/ldez/go-git-cmd-wrapper/v2/push"
 	"github.com/rs/zerolog/log"
 )
 
 func (c *Connection) Push() error {
-	if c.Repository == nil {
-		return fmt.Errorf("repository is not initialized")
+	directory := c.Options.Directory
+	if directory == "" {
+		return fmt.Errorf("directory is not specified")
 	}
 
-	remote, err := c.Repository.Remotes.Lookup("origin")
+	startTime := time.Now()
+
+	lock.Lock()
+	defer lock.Unlock()
+
+	privateKeyFile, err := c.provideSshAuthentication()
 	if err != nil {
-		log.Error().Err(err).Msg("Error looking up remote")
-		return fmt.Errorf("error looking up remote: %w", err)
+		return err
 	}
+	defer cleanSshAuthentication(privateKeyFile)
 
-	pushOptions := &git2go.PushOptions{
-		RemoteCallbacks: git2go.RemoteCallbacks{
-			CredentialsCallback: c.credentialsCallback,
-		},
-	}
-
-	refspec := fmt.Sprintf("refs/heads/%s:refs/heads/%s", c.Options.Branch, c.Options.Branch)
-
-	err = remote.Push([]string{refspec}, pushOptions)
+	msg, err := git.Push(
+		runGitIn(directory),
+		push.Remote("origin"),
+		push.RefSpec(c.Options.Branch),
+	)
 	if err != nil {
-		log.Error().Err(err).Msg("Error pushing to remote")
-		return fmt.Errorf("error pushing to remote: %w", err)
+		log.Error().Err(err).Str("output", msg).Msg("Failed to push to remote")
+		return err
 	}
 
-	log.Debug().Str("branch", c.Options.Branch).Msg("Push completed successfully")
+	log.Debug().Msgf("Pushed to origin %s in %d ms", c.Options.Branch, time.Since(startTime).Milliseconds())
+
 	return nil
 }

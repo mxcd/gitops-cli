@@ -1,14 +1,17 @@
 package git
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
+	"sync"
 
-	git2go "github.com/libgit2/git2go/v34"
+	"github.com/ldez/go-git-cmd-wrapper/v2/git"
+	"github.com/ldez/go-git-cmd-wrapper/v2/types"
 	"github.com/rs/zerolog/log"
-
 	"golang.org/x/crypto/ssh"
 )
 
@@ -17,13 +20,15 @@ type ConnectionOptions struct {
 	Repository       string
 	Branch           string
 	Authentication   *Authentication
-	IgnoreSslHostKey bool
+	IgnoreSshHostKey bool
+	SkipSslVerify    bool
 	Signature        *Signature
 }
 
 type Authentication struct {
-	BasicAuth *BasicAuth
-	SshKey    *SshKey
+	BasicAuth   *BasicAuth
+	SshKey      *SshKey
+	SshUsername *string
 }
 
 type BasicAuth struct {
@@ -43,26 +48,14 @@ type Signature struct {
 }
 
 type Connection struct {
-	Repository *git2go.Repository
-	Options    *ConnectionOptions
+	Options *ConnectionOptions
 }
+
+var lock = &sync.Mutex{}
 
 func NewGitConnection(options *ConnectionOptions) (*Connection, error) {
 	connection := &Connection{
 		Options: options,
-	}
-
-	if options.Directory != "" {
-		stat, err := os.Stat(options.Directory)
-		if err == nil {
-			if stat.IsDir() {
-				repository, err := git2go.OpenRepository(options.Directory)
-				if err != nil {
-					return nil, err
-				}
-				connection.Repository = repository
-			}
-		}
 	}
 
 	if options.Signature == nil {
@@ -75,28 +68,6 @@ func NewGitConnection(options *ConnectionOptions) (*Connection, error) {
 	}
 
 	return connection, nil
-}
-
-func GetAuthFromUsernamePassword(username string, password string) (*Authentication, error) {
-	return &Authentication{
-		BasicAuth: &BasicAuth{
-			Username: username,
-			Password: password,
-		},
-	}, nil
-}
-
-func GetAuthFromBasicAuthString(basicAuth string) (*Authentication, error) {
-	split := strings.Split(basicAuth, ":")
-	if len(split) != 2 {
-		return nil, errors.New("invalid basic auth string")
-	}
-	return &Authentication{
-		BasicAuth: &BasicAuth{
-			Username: split[0],
-			Password: split[1],
-		},
-	}, nil
 }
 
 func GetAuthFromSshKey(sshKey []byte, sshKeyPassphrase *string) (*Authentication, error) {
@@ -124,54 +95,88 @@ func GetAuthFromSshKey(sshKey []byte, sshKeyPassphrase *string) (*Authentication
 	}, nil
 }
 
-func (c *Connection) credentialsCallback(url string, usernameFromURL string, allowedTypes git2go.CredentialType) (*git2go.Credential, error) {
-
-	if c.Options.Authentication == nil {
-		return git2go.NewCredentialDefault()
-	}
-
-	if c.Options.Authentication.BasicAuth != nil {
-		return git2go.NewCredentialUserpassPlaintext(c.Options.Authentication.BasicAuth.Username, c.Options.Authentication.BasicAuth.Password)
-	}
-
-	if c.Options.Authentication.SshKey != nil {
-		return git2go.NewCredentialSSHKeyFromSigner(usernameFromURL, *c.Options.Authentication.SshKey.Signer)
-	}
-
-	return git2go.NewCredentialDefault()
+func GetAuthFromUsernamePassword(username string, password string) (*Authentication, error) {
+	return &Authentication{
+		BasicAuth: &BasicAuth{
+			Username: username,
+			Password: password,
+		},
+	}, nil
 }
 
-func (c *Connection) HasChanges() (bool, error) {
-	if c.Repository == nil {
-		return false, fmt.Errorf("repository is not initialized")
+func GetAuthFromBasicAuthString(basicAuth string) (*Authentication, error) {
+	split := strings.Split(basicAuth, ":")
+	if len(split) != 2 {
+		return nil, errors.New("invalid basic auth string")
+	}
+	return &Authentication{
+		BasicAuth: &BasicAuth{
+			Username: split[0],
+			Password: split[1],
+		},
+	}, nil
+}
+
+func runGitIn(path string) types.Option {
+	return git.CmdExecutor(
+		func(ctx context.Context, name string, debug bool, args ...string) (string, error) {
+			cmd := exec.CommandContext(ctx, name, args...)
+			cmd.Dir = path
+
+			output, err := cmd.CombinedOutput()
+			return strings.TrimSuffix(string(output), "\n"), err
+		},
+	)
+}
+
+func (c *Connection) provideSshAuthentication() (*os.File, error) {
+	// use ssh authentication only if provided
+	if c.Options.Authentication != nil && c.Options.Authentication.SshKey != nil {
+		key := c.Options.Authentication.SshKey
+		// TODO add support for passphrase and ssh-agent
+		if key.Passphrase != nil {
+			log.Panic().Msg("Passphrase support is not implemented")
+		}
+
+		privateKeyFile, err := os.CreateTemp("", "git-ssh-key-*")
+		if err != nil {
+			log.Error().Err(err).Msg("Error creating temporary file for SSH key")
+			return nil, err
+		}
+
+		if _, err := privateKeyFile.Write([]byte(key.PrivateKey)); err != nil {
+			log.Error().Err(err).Msg("Error writing SSH key to temporary file")
+			os.Remove(privateKeyFile.Name())
+			return nil, err
+		}
+		if err := privateKeyFile.Chmod(0600); err != nil {
+			log.Error().Err(err).Msg("Error setting permissions on SSH key file")
+			os.Remove(privateKeyFile.Name())
+			return nil, err
+		}
+
+		strictHostKeyChecking := ""
+		if c.Options.IgnoreSshHostKey {
+			strictHostKeyChecking = "-o StrictHostKeyChecking=no"
+		}
+
+		sshCommand := fmt.Sprintf("ssh -i %s %s", privateKeyFile.Name(), strictHostKeyChecking)
+		if err := os.Setenv("GIT_SSH_COMMAND", sshCommand); err != nil {
+			log.Error().Err(err).Msg("Error setting GIT_SSH_COMMAND")
+			os.Remove(privateKeyFile.Name())
+			return nil, err
+		}
+
+		return privateKeyFile, nil
 	}
 
-	index, err := c.Repository.Index()
-	if err != nil {
-		return false, fmt.Errorf("error accessing repository index: %w", err)
+	return nil, nil
+}
+
+func cleanSshAuthentication(privateKeyFile *os.File) {
+	if privateKeyFile != nil {
+		if err := os.Remove(privateKeyFile.Name()); err != nil {
+			log.Error().Err(err).Msg("Error removing temporary SSH key file")
+		}
 	}
-
-	if index.EntryCount() > 0 {
-		log.Debug().Msg("Staged changes detected")
-		return true, nil
-	}
-
-	statusList, err := c.Repository.StatusList(&git2go.StatusOptions{
-		Show:  git2go.StatusShowIndexAndWorkdir,
-		Flags: git2go.StatusOptIncludeUntracked,
-	})
-	if err != nil {
-		return false, fmt.Errorf("error retrieving repository status: %w", err)
-	}
-	defer statusList.Free()
-
-	statusCount, err := statusList.EntryCount()
-	if err != nil {
-		return false, fmt.Errorf("error getting status entry count: %w", err)
-	}
-
-	hasChanges := statusCount > 0
-	log.Debug().Bool("hasChanges", hasChanges).Msg("Checked repository status")
-
-	return hasChanges, nil
 }
