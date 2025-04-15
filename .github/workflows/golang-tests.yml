@@ -25,4 +25,4 @@ jobs:
         env:
           SOPS_AGE_KEY_FILE: ${{ github.workspace }}/test_assets/keys.txt
           GITOPS_ROOT_DIR: ${{ github.workspace }}
-        run: go test ./...
+        run: go test ./internal/... -race
