@@ -44,6 +44,8 @@ git clone ssh://localhost:23231/gitops-test.git $BASE/hack/soft-serve/gitops-tes
 mkdir -p $BASE/hack/soft-serve/gitops-test/applications/dev/service-test
 cp $BASE/hack/soft-serve/fixtures/values.yaml $BASE/hack/soft-serve/gitops-test/applications/dev/service-test/values.yaml
 cd $BASE/hack/soft-serve/gitops-test
+git config user.name "Soft-Serve"
+git config user.email "soft-serve@localhost"
 git checkout -b main
 git add .
 git commit -m "feat: add service-test application"
