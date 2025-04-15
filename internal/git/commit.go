@@ -57,15 +57,11 @@ func (c *Connection) HasChanges() (bool, error) {
 		return false, fmt.Errorf("directory is not specified")
 	}
 
-	msg, err := git.Raw("update-index", runGitIn(directory), func(g *types.Cmd) {
+	git.Raw("update-index", runGitIn(directory), func(g *types.Cmd) {
 		g.AddOptions("--refresh")
 	})
-	if err != nil {
-		log.Error().Err(err).Str("output", msg).Msg("Failed to refresh index")
-		return false, err
-	}
 
-	_, err = git.Raw("diff-files", runGitIn(directory), func(g *types.Cmd) {
+	_, err := git.Raw("diff-files", runGitIn(directory), func(g *types.Cmd) {
 		g.AddOptions("--quiet")
 	})
 	if err != nil {
