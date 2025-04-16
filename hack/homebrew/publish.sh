@@ -57,7 +57,7 @@ git clone https://$USERNAME:$TOKEN@github.com/mxcd/homebrew-gitops.git
 export RELEASE_SHA256="$SHA"
 export RELEASE_VERSION="$VERSION"
 
-cat $BASE/hack/scripts/homebrew/gitops.rb | envsubst > $BASE/homebrew-gitops/Formula/gitops.rb
+cat $BASE/hack/homebrew/gitops.rb | envsubst > $BASE/homebrew-gitops/Formula/gitops.rb
 
 cd $BASE/homebrew-gitops
 git add Formula/gitops.rb
