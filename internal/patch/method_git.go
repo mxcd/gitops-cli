@@ -189,12 +189,12 @@ func (p *GitPatcher) Patch(patchTasks []PatchTask) error {
 		return p.GitConnection.Push()
 	}
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 5; i++ {
 		err = executePush()
 		if err == nil {
 			break
 		}
-		time.Sleep(5 * time.Second)
+		time.Sleep(time.Duration(i+1) * time.Second)
 	}
 
 	return err

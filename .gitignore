@@ -6,10 +6,10 @@ homebrew-gitops/
 .gitops-state.yaml
 sandbox/
 
-.github/hack/soft-serve/data/
-.github/hack/soft-serve/gitops-test/
-.github/hack/soft-serve/ssh-key
-.github/hack/soft-serve/ssh-key.pub
+hack/soft-serve/data/
+hack/soft-serve/gitops-test/
+hack/soft-serve/ssh-key
+hack/soft-serve/ssh-key.pub
 
 .vscode/launch.json
 
