@@ -20,7 +20,7 @@ jobs:
         with:
           go-version: 1.24
       - name: start soft-serve
-        run: ./hack/soft-serve/start.sh
+        run: .github/hack/soft-serve/start.sh
       - name: run golang tests
         env:
           SOPS_AGE_KEY_FILE: ${{ github.workspace }}/test_assets/keys.txt
