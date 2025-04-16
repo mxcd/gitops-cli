@@ -1,16 +1,19 @@
-name: Docker build
+name: Docker test builds
 
 on:
   push:
-    branches: [main, golang]
+    branches: [main]
   pull_request:
     branches: [main]
 
 jobs:
-  build:
-    name: Docker Build
+  docker:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [gitops, repo-server]
+    name: docker build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
       - name: Set up QEMU
@@ -23,5 +26,4 @@ jobs:
         with:
           platforms: linux/amd64
           push: false
-      - name: Image digest
-        run: echo ${{ steps.docker_build.outputs.digest }}
+          file: docker/${{ matrix.image }}/Dockerfile
