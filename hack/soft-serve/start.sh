@@ -54,5 +54,3 @@ git commit -m "feat: add service-test application"
 git push origin main
 
 cd $BASE
-
-chmod -R 644 $BASE/hack
