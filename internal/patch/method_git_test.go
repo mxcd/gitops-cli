@@ -16,7 +16,7 @@ func getSshKeyData(t *testing.T) []byte {
 	assert.NoError(t, err)
 	assert.NotEmpty(t, baseDir)
 
-	sshKeyPath := path.Join(baseDir, ".github", "hack", "soft-serve", "ssh-key")
+	sshKeyPath := path.Join(baseDir, "hack", "soft-serve", "ssh-key")
 	assert.FileExists(t, sshKeyPath)
 
 	sshKey, err := os.ReadFile(sshKeyPath)
