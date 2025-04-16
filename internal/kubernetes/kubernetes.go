@@ -1,4 +1,4 @@
-package main
+package kubernetes
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/TwiN/go-color"
 	"github.com/google/uuid"
+	"github.com/mxcd/gitops-cli/internal/finalizer"
 	"github.com/mxcd/gitops-cli/internal/k8s"
 	"github.com/mxcd/gitops-cli/internal/plan"
 	"github.com/mxcd/gitops-cli/internal/secret"
@@ -17,7 +18,7 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
-func applyKubernetes(c *cli.Context) error {
+func ApplyKubernetes(c *cli.Context) error {
 	p, err := createKubernetesPlan(c)
 	if err != nil {
 		return err
@@ -26,7 +27,7 @@ func applyKubernetes(c *cli.Context) error {
 	// exit if there is nothing to do
 	if p.NothingToDo() {
 		println(color.InGreen("No changes to apply."))
-		exitApplication(c, true)
+		finalizer.ExitApplication(c, true)
 		return nil
 	}
 
@@ -55,11 +56,11 @@ func applyKubernetes(c *cli.Context) error {
 	println("")
 	println(color.InGreen("All changes applied."))
 
-	exitApplication(c, true)
+	finalizer.ExitApplication(c, true)
 	return nil
 }
 
-func planKubernetes(c *cli.Context) error {
+func PlanKubernetes(c *cli.Context) error {
 	clusterLimitString := getClusterLimit(c)
 
 	p, err := createKubernetesPlan(c)
@@ -78,7 +79,7 @@ func planKubernetes(c *cli.Context) error {
 		applyString := fmt.Sprintf("gitops secrets%s apply kubernetes %s", dirLimitString, clusterLimitString)
 		println(color.InBold("use"), color.InGreen(color.InBold(applyString)), color.InBold("to apply these changes to your cluster"))
 	}
-	exitApplication(c, false)
+	finalizer.ExitApplication(c, false)
 	return nil
 }
 

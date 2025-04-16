@@ -9,7 +9,7 @@ jobs:
     name: Publish homebrew formula
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@v4
       - name: Setup git user
         run: |
           git config --global user.name "$(git --no-pager log --format=format:'%an' -n 1)"
@@ -19,4 +19,4 @@ jobs:
       - name: print sha256
         run: cat sha256.txt
       - name: publish homebrew formula
-        run: ./.github/scripts/homebrew/publish.sh -u mxcd -t ${{ secrets.CI_PAT }} -v ${{ github.ref_name }} -s $(cat sha256.txt)
+        run: ./hack/homebrew/publish.sh -u mxcd -t ${{ secrets.CI_PAT }} -v ${{ github.ref_name }} -s $(cat sha256.txt)

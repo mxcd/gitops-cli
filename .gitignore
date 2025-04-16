@@ -4,6 +4,16 @@
 
 homebrew-gitops/
 .gitops-state.yaml
+sandbox/
+
+hack/soft-serve/data/
+hack/soft-serve/gitops-test/
+hack/soft-serve/ssh-key
+hack/soft-serve/ssh-key.pub
+
+.vscode/launch.json
+
+.env
 
 # Ignore "main" binary
 main
@@ -11,6 +21,7 @@ main
 gitops
 # Actually... dont ignore gitops directory
 !cmd/gitops/
+!docker/gitops/
 
 # Created by https://www.toptal.com/developers/gitignore/api/go,visualstudiocode,goland+all
 # Edit at https://www.toptal.com/developers/gitignore?templates=go,visualstudiocode,goland+all
