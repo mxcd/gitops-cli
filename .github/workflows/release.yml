@@ -34,7 +34,7 @@ jobs:
           GOARCH: ${{ matrix.arch }}
         run: |
           cd cmd/gitops
-          go build -ldflags="-s -w" .
+          go build -ldflags="-s -w -X 'main.version=${{ github.ref_name }}'" .
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
@@ -69,5 +69,7 @@ jobs:
         with:
           platforms: linux/amd64
           push: true
+          build-args: |
+            GITOPS_VERSION=${{ github.ref_name }}
           tags: ghcr.io/mxcd/gitops/${{ matrix.image }}:${{ github.ref_name }}
           file: docker/${{ matrix.image }}/Dockerfile

@@ -15,10 +15,19 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+var version = "development"
+
 func main() {
+	cli.VersionFlag = &cli.BoolFlag{
+		Name:    "version",
+		Aliases: []string{},
+		Usage:   "print only the version",
+	}
+
 	app := &cli.App{
-		Name:  "gitpos",
-		Usage: "GitOps CLI",
+		Name:    "gitpos",
+		Version: version,
+		Usage:   "GitOps CLI",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "root-dir",
