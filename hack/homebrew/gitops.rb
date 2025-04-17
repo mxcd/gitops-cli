@@ -10,7 +10,7 @@ class Gitops < Formula
     # ENV["GOPATH"] = buildpath
     path = buildpath/"cmd/gitops"
     cd path do
-      system "go", "build", "-o", "#{bin}/gitops"
+      system "go", "build", "-ldflags=\"-s -w -X 'main.version=${RELEASE_VERSION}'\"" "-o", "#{bin}/gitops"
     end
   end
 
