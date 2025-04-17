@@ -32,14 +32,14 @@ jobs:
       - name: golang build
         env:
           GOARCH: ${{ matrix.arch }}
-        run: |
-          cd cmd/gitops
-          go build -ldflags="-s -w -X 'main.version=${{ github.ref_name }}'" .
+          GOOS: ${{ matrix.os_name }}
+          CGO_ENABLED: 0
+        run: go build -o gitops -ldflags="-s -w -X 'main.version=${{ github.ref_name }}'" cmd/gitops/main.go
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ${{ github.workspace }}/cmd/gitops/gitops${{ matrix.artifact_suffix }}
+          file: gitops${{ matrix.artifact_suffix }}
           asset_name: gitops_${{ matrix.os_name }}_${{ matrix.arch }}${{ matrix.artifact_suffix }}
           tag: ${{ github.ref }}
   docker:
