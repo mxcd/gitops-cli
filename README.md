@@ -381,3 +381,52 @@ To make one's life easier, a pre-commit config is provided that can be installed
 ```bash
 pre-commit install --hook-type commit-msg
 ```
+
+## Repo Server
+The repo server allows to run the GitOps CLI in a server mode. 
+This is especially useful if many concurrent patches are to be expected (e.g. due to matrix builds of multiple services). 
+The server will clone the defined GitOps cluster repository and apply patches when instructed via the REST API.
+
+### Running the server
+The most basic configuration uses https and basic auth:
+```bash
+docker run --platform linux/amd64 --rm -it -p 8080:8080 \
+  -e GITOPS_REPOSITORY="https://github.com/<owner>/<repo>" \
+  -e GITOPS_REPOSITORY_BASICAUTH="<username>:<personal-access-token>" \
+  -e API_KEYS="<super-secret-api-key>" \
+  ghcr.io/mxcd/gitops/repo-server:2.2.3
+```
+
+`API_KEYS` is a comma separated list of API keys that are used to authenticate the requests.
+
+### Using the server
+The server exposes a REST API that can be used to apply patches to the GitOps repository.
+The API is available at `PUT <protocol>://<host>:<port>/api/v1/patch`  
+
+```bash
+# env vars used for example curl BUT also valid for CLI usage
+export GITOPS_REPOSITORY_SERVER="<protocol>://<host>[:<port>]/api/v1"
+export GITOPS_REPOSITORY_SERVER_API_KEY="<super-secret-api-key>"
+```
+
+```bash
+curl --request PUT \
+  --url $GITOPS_REPOSITORY_SERVER/patch \
+  --header 'content-type: application/json' \
+  --header 'X-API-Key: $GITOPS_REPOSITORY_SERVER_API_KEY'
+  --data '{
+  "filePath": "applications/dev/service-foo/values.yaml",
+  "patches": [
+    {
+      "selector": ".service.image.tag",
+      "value": "v42.0.1"
+    }
+  ]
+}'
+```
+
+```bash
+# Equivalent CLI command
+# Evaluates the previously exported env vars GITOPS_REPOSITORY_SERVER and GITOPS_REPOSITORY_SERVER_API_KEY
+gitops patch applications/dev/service-foo/values.yaml .service.image.tag v42.0.1
+```
