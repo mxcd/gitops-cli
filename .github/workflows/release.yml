@@ -37,7 +37,7 @@ jobs:
           GOARCH: ${{ matrix.arch }}
           GOOS: ${{ matrix.goos }}
           CGO_ENABLED: 0
-        run: go build -o gitops -ldflags="-s -w -X 'main.version=${{ github.ref_name }}'" cmd/gitops/main.go
+        run: go build -o gitops${{ matrix.artifact_suffix }} -ldflags="-s -w -X 'main.version=${{ github.ref_name }}'" cmd/gitops/main.go
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
