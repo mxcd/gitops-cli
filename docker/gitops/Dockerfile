@@ -12,7 +12,7 @@ COPY cmd cmd
 COPY internal internal
 
 WORKDIR /usr/src/cmd/gitops
-RUN go build -o gitops -ldflags="-s -w 'main.version=${GITOPS_VERSION}'" .
+RUN go build -o gitops -ldflags="-s -w -X 'main.version=${GITOPS_VERSION}'" .
 
 FROM alpine:3.20
 WORKDIR /usr/bin
