@@ -9,18 +9,18 @@ import (
 
 func TestMapMerge1(t *testing.T) {
 	a := map[interface{}]interface{}{
-		"foo": "bar",
+		"foo":  "bar",
 		"fizz": "buzz",
 	}
 	b := map[interface{}]interface{}{
 		"fizz": "fizz",
 	}
 	c := map[interface{}]interface{}{
-		"foo": "bar",
+		"foo":  "bar",
 		"fizz": "fizz",
 	}
 	d := mergeMaps(a, b)
-	assert.Equal(t, c, d, "Maps should be equal")	
+	assert.Equal(t, c, d, "Maps should be equal")
 }
 
 func TestMapMerge2(t *testing.T) {
@@ -39,7 +39,7 @@ func TestMapMerge2(t *testing.T) {
 		"d": "4",
 	}
 	d := mergeMaps(a, b)
-	assert.Equal(t, c, d, "Maps should be equal")	
+	assert.Equal(t, c, d, "Maps should be equal")
 }
 
 func TestMapMerge3(t *testing.T) {
@@ -55,7 +55,7 @@ func TestMapMerge3(t *testing.T) {
 		"b": 42,
 	}
 	d := mergeMaps(a, b)
-	assert.Equal(t, c, d, "Maps should be equal")	
+	assert.Equal(t, c, d, "Maps should be equal")
 }
 
 func TestMapMerge4(t *testing.T) {
@@ -71,7 +71,7 @@ func TestMapMerge4(t *testing.T) {
 		"b": []interface{}{"2", "3"},
 	}
 	d := mergeMaps(a, b)
-	assert.Equal(t, c, d, "Maps should be equal")	
+	assert.Equal(t, c, d, "Maps should be equal")
 }
 
 func TestTemplateValuesMerge(t *testing.T) {
@@ -159,17 +159,16 @@ func TestTemplateValuesMerge(t *testing.T) {
 	assert.Equal(t, expectedMergedTemplateValues, templateValues, "TemplateValues should be equal")
 }
 
-
 func TestValuesFileLoading(t *testing.T) {
 	c := util.GetDummyCliContext()
 	util.SetCliContext(c)
 	util.ComputeRootDir(c)
-	
+
 	LoadValues()
-	
+
 	valuesSet1 := map[interface{}]interface{}{
-		"namespace": "gitops-dev",
-		"stage": "dev",
+		"namespace":        "gitops-dev",
+		"stage":            "dev",
 		"databaseUsername": "my-very-strong-username",
 		"databasePassword": "my-very-strong-password",
 	}
@@ -178,12 +177,61 @@ func TestValuesFileLoading(t *testing.T) {
 	assert.Equal(t, valuesSet1, mergedValues1, "Values should be equal")
 
 	valuesSet2 := map[interface{}]interface{}{
-		"namespace": "gitops-dev",
-		"stage": "sub-dev",
+		"namespace":        "gitops-dev",
+		"stage":            "sub-dev",
 		"databaseUsername": "my-very-strong-username",
 		"databasePassword": "my-very-strong-password",
-		"key": "fooo",
+		"key":              "fooo",
 	}
 	mergedValues2 := GetValuesForPath("test_assets/subdirectory/subdir-secret.gitops.secret.enc.yml")
 	assert.Equal(t, valuesSet2, mergedValues2, "Values should be equal")
+}
+
+func TestFilterValuesFiles(t *testing.T) {
+	valuesFiles := []string{
+		"values.gitops.secret.enc.yml",
+		"foo/values.gitops.secret.enc.yml",
+		"foo/bar/values.gitops.secret.enc.yml",
+		"foo/bar/baz/values.gitops.secret.enc.yml",
+		"foo/other/values.gitops.secret.enc.yml",
+	}
+
+	testCases := []struct {
+		name     string
+		dirLimit string
+		expected []string
+	}{
+		{
+			name:     "no dir limit returns all",
+			dirLimit: "",
+			expected: valuesFiles,
+		},
+		{
+			name:     "limit includes ancestors and descendants",
+			dirLimit: "foo/bar",
+			expected: []string{
+				"values.gitops.secret.enc.yml",
+				"foo/values.gitops.secret.enc.yml",
+				"foo/bar/values.gitops.secret.enc.yml",
+				"foo/bar/baz/values.gitops.secret.enc.yml",
+			},
+		},
+		{
+			name:     "limit with trailing slash",
+			dirLimit: "foo/bar/",
+			expected: []string{
+				"values.gitops.secret.enc.yml",
+				"foo/values.gitops.secret.enc.yml",
+				"foo/bar/values.gitops.secret.enc.yml",
+				"foo/bar/baz/values.gitops.secret.enc.yml",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			filtered := filterValuesFiles(valuesFiles, tc.dirLimit)
+			assert.Equal(t, tc.expected, filtered)
+		})
+	}
 }

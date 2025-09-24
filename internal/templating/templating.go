@@ -39,6 +39,10 @@ func LoadValues() error {
 		}
 	}
 
+	valuesFiles = filterValuesFiles(valuesFiles, util.GetCliContext().String("dir"))
+
+	templateValues = TemplateValues{}
+
 	for _, valuesFile := range valuesFiles {
 		log.Trace("Loading secret values file: ", valuesFile)
 		absoluteSecretPath := path.Join(util.GetRootDir(), valuesFile)
@@ -57,6 +61,42 @@ func LoadValues() error {
 	templateValues.merge()
 	loaded = true
 	return nil
+}
+
+func filterValuesFiles(valuesFiles []string, dirLimit string) []string {
+	dirLimitNormalized := normalizeDirPath(dirLimit)
+	if dirLimitNormalized == "" {
+		return valuesFiles
+	}
+
+	filtered := make([]string, 0, len(valuesFiles))
+	for _, valuesFile := range valuesFiles {
+		valuesDir := normalizeDirPath(filepath.Dir(valuesFile))
+		if shouldIncludeValuesFile(valuesDir, dirLimitNormalized) {
+			filtered = append(filtered, valuesFile)
+		}
+	}
+	return filtered
+}
+
+func shouldIncludeValuesFile(valuesDir string, dirLimit string) bool {
+	if dirLimit == "" {
+		return true
+	}
+	if valuesDir == "" {
+		return true
+	}
+	return strings.HasPrefix(valuesDir, dirLimit) || strings.HasPrefix(dirLimit, valuesDir)
+}
+
+func normalizeDirPath(dir string) string {
+	dir = filepath.ToSlash(strings.TrimSpace(dir))
+	dir = strings.TrimPrefix(dir, "./")
+	dir = strings.Trim(dir, "/")
+	if dir == "" || dir == "." {
+		return ""
+	}
+	return dir + "/"
 }
 
 func mergeMaps(a, b map[interface{}]interface{}) map[interface{}]interface{} {
