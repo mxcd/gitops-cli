@@ -1,10 +1,13 @@
 package plan
 
 import (
+	"sync"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/mxcd/gitops-cli/internal/k8s"
 	"github.com/mxcd/gitops-cli/internal/secret"
+	"github.com/mxcd/gitops-cli/internal/util"
 )
 
 type Plan struct {
@@ -64,33 +67,83 @@ func (p *Plan) Execute() error {
 }
 
 func executeKubernetesPlan(p *Plan) error {
+	parallelism := util.GetCliContext().Int("parallelism")
+	if parallelism < 1 {
+		parallelism = 1
+	}
+
+	// Filter items that need processing
+	itemsToProcess := []PlanItem{}
 	for _, item := range p.Items {
-		if item.Diff.Equal {
+		if !item.Diff.Equal {
+			itemsToProcess = append(itemsToProcess, item)
+		} else {
 			log.Trace("Secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " is equal, skipping...")
-			continue
-		}
-		if item.Diff.Type == secret.SecretDiffTypeAdded {
-			log.Trace("Secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " is new, creating...")
-			err := k8s.CreateSecret(item.LocalSecret, item.LocalSecret.Target)
-			if err != nil {
-				log.Error("Failed to create secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " in cluster")
-				return err
-			}
-		} else if item.Diff.Type == secret.SecretDiffTypeChanged {
-			log.Trace("Secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " is modified, updating...")
-			err := k8s.UpdateSecret(item.LocalSecret, item.LocalSecret.Target)
-			if err != nil {
-				log.Error("Failed to update secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " in cluster")
-				return err
-			}
-		} else if item.Diff.Type == secret.SecretDiffTypeRemoved {
-			log.Trace("Secret ", item.RemoteSecret.Namespace, "/", item.RemoteSecret.Name, " is deleted, deleting...")
-			err := k8s.DeleteSecret(item.RemoteSecret, item.RemoteSecret.Target)
-			if err != nil {
-				log.Error("Failed to delete secret ", item.RemoteSecret.Namespace, "/", item.RemoteSecret.Name, " in cluster")
-				return err
-			}
 		}
 	}
+
+	if len(itemsToProcess) == 0 {
+		return nil
+	}
+
+	// Create channels for parallel processing
+	itemChan := make(chan PlanItem, len(itemsToProcess))
+	errorChan := make(chan error, len(itemsToProcess))
+
+	// Start worker goroutines
+	var workerGroup sync.WaitGroup
+	for i := 0; i < parallelism; i++ {
+		workerGroup.Add(1)
+		go func() {
+			defer workerGroup.Done()
+			for item := range itemChan {
+				var err error
+				if item.Diff.Type == secret.SecretDiffTypeAdded {
+					log.Trace("Secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " is new, creating...")
+					err = k8s.CreateSecret(item.LocalSecret, item.LocalSecret.Target)
+					if err != nil {
+						log.Error("Failed to create secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " in cluster")
+					}
+				} else if item.Diff.Type == secret.SecretDiffTypeChanged {
+					log.Trace("Secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " is modified, updating...")
+					err = k8s.UpdateSecret(item.LocalSecret, item.LocalSecret.Target)
+					if err != nil {
+						log.Error("Failed to update secret ", item.LocalSecret.Namespace, "/", item.LocalSecret.Name, " in cluster")
+					}
+				} else if item.Diff.Type == secret.SecretDiffTypeRemoved {
+					log.Trace("Secret ", item.RemoteSecret.Namespace, "/", item.RemoteSecret.Name, " is deleted, deleting...")
+					err = k8s.DeleteSecret(item.RemoteSecret, item.RemoteSecret.Target)
+					if err != nil {
+						log.Error("Failed to delete secret ", item.RemoteSecret.Namespace, "/", item.RemoteSecret.Name, " in cluster")
+					}
+				}
+				if err != nil {
+					errorChan <- err
+				}
+			}
+		}()
+	}
+
+	// Send work to workers
+	go func() {
+		for _, item := range itemsToProcess {
+			itemChan <- item
+		}
+		close(itemChan)
+	}()
+
+	// Wait for all workers to finish
+	go func() {
+		workerGroup.Wait()
+		close(errorChan)
+	}()
+
+	// Check for errors
+	for err := range errorChan {
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

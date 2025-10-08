@@ -3,6 +3,7 @@ package secret
 import (
 	"errors"
 	"strings"
+	"sync"
 
 	"github.com/mxcd/gitops-cli/internal/util"
 	"github.com/schollz/progressbar/v3"
@@ -40,6 +41,11 @@ func LoadLocalSecretsLimited(targetTypeFilter SecretTargetType, directoryLimit s
 	}
 	secretFileNames = filteredFileNames
 
+	parallelism := util.GetCliContext().Int("parallelism")
+	if parallelism < 1 {
+		parallelism = 1
+	}
+
 	secrets := []*Secret{}
 	bar := progressbar.NewOptions(len(secretFileNames),
 		progressbar.OptionEnableColorCodes(true),
@@ -50,19 +56,58 @@ func LoadLocalSecretsLimited(targetTypeFilter SecretTargetType, directoryLimit s
 		progressbar.OptionSetPredictTime(false),
 		progressbar.OptionSetDescription("[green][Loading local secrets][reset]"),
 	)
-	for _, secretFileName := range secretFileNames {
-		bar.Add(1)
-		secret, err := FromPath(secretFileName)
-		if err != nil {
-			bar.Finish()
-			return nil, err
+
+	// Create channels for parallel processing
+	type secretResult struct {
+		secret *Secret
+		err    error
+	}
+	
+	secretChan := make(chan string, len(secretFileNames))
+	resultChan := make(chan secretResult, len(secretFileNames))
+	
+	// Start worker goroutines
+	var workerGroup sync.WaitGroup
+	for i := 0; i < parallelism; i++ {
+		workerGroup.Add(1)
+		go func() {
+			defer workerGroup.Done()
+			for secretFileName := range secretChan {
+				secret, err := FromPath(secretFileName)
+				resultChan <- secretResult{secret: secret, err: err}
+			}
+		}()
+	}
+	
+	// Send work to workers
+	go func() {
+		for _, secretFileName := range secretFileNames {
+			secretChan <- secretFileName
 		}
+		close(secretChan)
+	}()
+	
+	// Wait for all workers to finish and close result channel
+	go func() {
+		workerGroup.Wait()
+		close(resultChan)
+	}()
+	
+	// Collect results
+	for result := range resultChan {
+		bar.Add(1)
+		if result.err != nil {
+			bar.Finish()
+			return nil, result.err
+		}
+		
+		secret := result.secret
 		if secret.TargetType != targetTypeFilter && targetTypeFilter != SecretTargetTypeAll {
-			log.Trace("Skipping file due to targetType filter: ", secretFileName)
+			log.Trace("Skipping file due to targetType filter: ", secret.Path)
 			continue
 		}
 		if clusterLimit != "" && secret.Target != clusterLimit {
-			log.Trace("Skipping file due to target filter: ", secretFileName)
+			log.Trace("Skipping file due to target filter: ", secret.Path)
 			continue
 		}
 		for _, s := range secrets {
