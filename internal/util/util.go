@@ -49,7 +49,7 @@ func GetSecretFiles() ([]string, error) {
 			}
 
 			if secretFileRegex.MatchString(path) {
-				log.Debug("Found secret file: ", path)				
+				log.Trace("Found secret file: ", path)				
 				relativePath, err := filepath.Rel(GetRootDir(), path)
 				if err != nil {
 					log.Error("An error occurred while getting the relative path of the secret file")

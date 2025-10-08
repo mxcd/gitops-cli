@@ -64,7 +64,14 @@ func LoadValues() error {
 }
 
 func filterValuesFiles(valuesFiles []string, dirLimit string) []string {
+	// If dirLimit points to a secret file, extract its directory
+	if strings.HasSuffix(dirLimit, ".gitops.secret.enc.yaml") || strings.HasSuffix(dirLimit, ".gitops.secret.enc.yml") {
+		dirLimit = filepath.Dir(dirLimit)
+		log.Debugf("Converted file-based dir limit to directory: %q", dirLimit)
+	}
+	
 	dirLimitNormalized := normalizeDirPath(dirLimit)
+	log.Debugf("Filtering values files with dirLimit=%q normalized=%q", dirLimit, dirLimitNormalized)
 	if dirLimitNormalized == "" {
 		return valuesFiles
 	}
@@ -72,8 +79,12 @@ func filterValuesFiles(valuesFiles []string, dirLimit string) []string {
 	filtered := make([]string, 0, len(valuesFiles))
 	for _, valuesFile := range valuesFiles {
 		valuesDir := normalizeDirPath(filepath.Dir(valuesFile))
-		if shouldIncludeValuesFile(valuesDir, dirLimitNormalized) {
+		include := shouldIncludeValuesFile(valuesDir, dirLimitNormalized)
+		log.Debugf("Evaluating values file %q dir=%q normalizedDir=%q include=%v", valuesFile, filepath.Dir(valuesFile), valuesDir, include)
+		if include {
 			filtered = append(filtered, valuesFile)
+		} else {
+			log.Debugf("Excluding values file %q due to dir limit %q", valuesFile, dirLimitNormalized)
 		}
 	}
 	return filtered
@@ -124,26 +135,34 @@ func (t TemplateValues) merge() {
 	sort.SliceStable(t, func(i, j int) bool {
 		return len(strings.Split(t[i].Path, "/")) < len(strings.Split(t[j].Path, "/"))
 	})
+	order := make([]string, len(t))
+	for idx, tv := range t {
+		order[idx] = tv.Path
+	}
+	log.Debugf("TemplateValues merge order: %v", order)
 	for i, templateValue := range t {
-		merged := false
-		for j, templateValue2 := range t {
-			if j >= i {
-				break
-			}
-
-			if strings.HasPrefix(templateValue.Path, templateValue2.Path) {
-				merged = true
-				templateValue.MergedValues = mergeMaps(templateValue2.MergedValues, templateValue.Values)
+		var bestParent *TemplateValuesPath
+		for j := i - 1; j >= 0; j-- {
+			candidate := t[j]
+			log.Debugf("Considering ancestor candidate %q for child %q", candidate.Path, templateValue.Path)
+			if strings.HasPrefix(templateValue.Path, candidate.Path) {
+				bestParent = candidate
 				break
 			}
 		}
-		if !merged {
+
+		if bestParent != nil {
+			log.Debugf("Merging ancestor %q into %q", bestParent.Path, templateValue.Path)
+			templateValue.MergedValues = mergeMaps(bestParent.MergedValues, templateValue.Values)
+		} else {
+			log.Debugf("No ancestor found for %q, using own values only", templateValue.Path)
 			templateValue.MergedValues = templateValue.Values
 		}
 	}
 }
 
 func GetValuesForPath(path string) map[interface{}]interface{} {
+	log.Debugf("Resolving values for secret path %q", path)
 	if !loaded {
 		err := LoadValues()
 		if err != nil {
@@ -154,17 +173,19 @@ func GetValuesForPath(path string) map[interface{}]interface{} {
 	usedPath := ""
 	maxPathLength := 0
 	for _, templateValue := range templateValues {
+		log.Debugf("Considering values prefix %q for path %q", templateValue.Path, path)
 		if strings.HasPrefix(path, templateValue.Path) && len(templateValue.Path) > maxPathLength {
 			maxPathLength = len(templateValue.Path)
 			usedPath = templateValue.Path
 			values = templateValue.MergedValues
+			log.Debugf("Selecting values prefix %q for path %q", templateValue.Path, path)
 		}
 	}
 
 	if usedPath != "" {
-		log.Tracef("Using values from %s for path %s", usedPath, path)
+		log.Debugf("Using values from %s for path %s", usedPath, path)
 	} else {
-		log.Tracef("No values found for path %s", path)
+		log.Debugf("No values found for path %s", path)
 	}
 
 	return values
