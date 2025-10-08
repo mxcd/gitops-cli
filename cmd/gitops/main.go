@@ -69,6 +69,13 @@ func main() {
 				Usage:   "display unchanged secrets in the plan overview",
 				EnvVars: []string{"GITOPS_SHOW_UNCHANGED"},
 			},
+			&cli.IntFlag{
+				Name:    "parallelism",
+				Aliases: []string{"p"},
+				Value:   5,
+				Usage:   "number of parallel operations for decrypting secrets and kubernetes operations",
+				EnvVars: []string{"GITOPS_PARALLELISM"},
+			},
 		},
 		Commands: []*cli.Command{
 			{

@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/TwiN/go-color"
 	"github.com/google/uuid"
@@ -122,6 +123,11 @@ func createKubernetesPlan(c *cli.Context) (*plan.Plan, error) {
 		Items:      []plan.PlanItem{},
 	}
 
+	parallelism := c.Int("parallelism")
+	if parallelism < 1 {
+		parallelism = 1
+	}
+
 	bar := progressbar.NewOptions(len(localSecrets),
 		progressbar.OptionEnableColorCodes(true),
 		progressbar.OptionShowBytes(false),
@@ -132,38 +138,79 @@ func createKubernetesPlan(c *cli.Context) (*plan.Plan, error) {
 		progressbar.OptionSetDescription("[green][Syncing local state with cluster][reset]"),
 	)
 
-	for _, localSecret := range localSecrets {
-		bar.Add(1)
-		// check for local secret in state
-		// update ID in localSecret if secret exists in state
-		// update hash in state if secret exists in state
-		stateSecret := state.GetState().GetByPath(localSecret.Path)
-		if stateSecret == nil {
-			log.Trace("Secret ", localSecret.CombinedName(), " does not exist in state")
-			localSecret.ID = uuid.New().String()
-			stateSecret = state.GetState().Add(localSecret)
-		} else {
-			log.Trace("Secret ", localSecret.CombinedName(), " exists in state. Updating")
-			stateSecret.Update(localSecret)
-		}
+	// Create channels for parallel processing
+	type planItemResult struct {
+		item plan.PlanItem
+		err  error
+	}
 
-		planItem := plan.PlanItem{
-			LocalSecret: localSecret,
-		}
+	secretChan := make(chan *secret.Secret, len(localSecrets))
+	resultChan := make(chan planItemResult, len(localSecrets))
 
-		remoteSecret, err := k8s.GetSecret(localSecret, localSecret.Target)
-		if err != nil {
-			if k8sErrors.IsNotFound(err) {
-				log.Trace("Secret ", localSecret.Name, " does not exist in Kubernetes cluster")
-			} else {
-				log.Error("Failed to get secret ", localSecret.Name, " from Kubernetes cluster")
-				return nil, err
+	// Start worker goroutines
+	var workerGroup sync.WaitGroup
+	for i := 0; i < parallelism; i++ {
+		workerGroup.Add(1)
+		go func() {
+			defer workerGroup.Done()
+			for localSecret := range secretChan {
+				// check for local secret in state
+				// update ID in localSecret if secret exists in state
+				// update hash in state if secret exists in state
+				stateSecret := state.GetState().GetByPath(localSecret.Path)
+				if stateSecret == nil {
+					log.Trace("Secret ", localSecret.CombinedName(), " does not exist in state")
+					localSecret.ID = uuid.New().String()
+					stateSecret = state.GetState().Add(localSecret)
+				} else {
+					log.Trace("Secret ", localSecret.CombinedName(), " exists in state. Updating")
+					stateSecret.Update(localSecret)
+				}
+
+				planItem := plan.PlanItem{
+					LocalSecret: localSecret,
+				}
+
+				remoteSecret, err := k8s.GetSecret(localSecret, localSecret.Target)
+				if err != nil {
+					if k8sErrors.IsNotFound(err) {
+						log.Trace("Secret ", localSecret.Name, " does not exist in Kubernetes cluster")
+					} else {
+						log.Error("Failed to get secret ", localSecret.Name, " from Kubernetes cluster")
+						resultChan <- planItemResult{err: err}
+						return
+					}
+				}
+
+				planItem.RemoteSecret = remoteSecret
+				planItem.ComputeDiff()
+				resultChan <- planItemResult{item: planItem, err: nil}
 			}
-		}
+		}()
+	}
 
-		planItem.RemoteSecret = remoteSecret
-		planItem.ComputeDiff()
-		p.AddItem(planItem)
+	// Send work to workers
+	go func() {
+		for _, localSecret := range localSecrets {
+			secretChan <- localSecret
+		}
+		close(secretChan)
+	}()
+
+	// Wait for all workers to finish and close result channel
+	go func() {
+		workerGroup.Wait()
+		close(resultChan)
+	}()
+
+	// Collect results
+	for result := range resultChan {
+		bar.Add(1)
+		if result.err != nil {
+			bar.Finish()
+			return nil, result.err
+		}
+		p.AddItem(result.item)
 	}
 	bar.Finish()
 	println("")
