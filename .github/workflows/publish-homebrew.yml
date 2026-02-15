@@ -1,8 +1,9 @@
 name: Publish homebrew
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 2.*
 
 jobs:
   test:
