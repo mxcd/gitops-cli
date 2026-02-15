@@ -31,6 +31,7 @@ func CreateK8sConfigMap(s *secret.Secret, clusterName string) error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: s.Name,
 			Namespace: s.Namespace,
+			Labels: s.Labels,
 			Annotations: map[string]string{
 				"gitops.mxcd.de/secret-id": s.ID,
 			},
@@ -57,6 +58,7 @@ func CreateK8sSecret(s *secret.Secret, clusterName string) error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: s.Name,
 			Namespace: s.Namespace,
+			Labels: s.Labels,
 			Annotations: map[string]string{
 				"gitops.mxcd.de/secret-id": s.ID,
 			},
@@ -92,6 +94,7 @@ func UpdateK8sSecret(s *secret.Secret, clusterName string) error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: s.Name,
 			Namespace: s.Namespace,
+			Labels: s.Labels,
 			Annotations: map[string]string{
 				"gitops.mxcd.de/secret-id": s.ID,
 			},
@@ -119,6 +122,7 @@ func UpdateK8sConfigMap(s *secret.Secret, clusterName string) error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: s.Name,
 			Namespace: s.Namespace,
+			Labels: s.Labels,
 			Annotations: map[string]string{
 				"gitops.mxcd.de/secret-id": s.ID,
 			},

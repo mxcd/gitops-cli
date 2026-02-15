@@ -44,6 +44,9 @@ type Secret struct {
 
 	// Data is the decrypted data from the secret file
 	Data map[string]string
+
+	// Labels are custom labels to apply to the k8s resource
+	Labels map[string]string
 }
 
 type SecretTargetType string
@@ -59,6 +62,7 @@ type SecretFile struct {
 	Type       string            `yaml:"type" default:"Opaque"`
 	Data			 map[string]string `yaml:"data"`
 	ID         string            `yaml:"id,omitempty"`
+	Labels     map[string]string `yaml:"labels,omitempty"`
 }
 
 type TemplateData struct {
@@ -130,6 +134,7 @@ func (s *Secret) Load() error {
 	}
 		
 	s.Data = secretFile.Data
+	s.Labels = secretFile.Labels
 
 	if util.GetCliContext().Bool("print") {
 		s.PrettyPrint()
