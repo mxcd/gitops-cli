@@ -175,6 +175,14 @@ func CompareSecrets(oldSecret *Secret, newSecret *Secret) *SecretDiff {
 				NewValue:  value,
 				Sensitive: true,
 			})
+		} else if value == oldSecret.Data[key] {
+			diffEntries = append(diffEntries, SecretDiffEntry{
+				Type:      SecretDiffTypeUnchanged,
+				Key:       fmt.Sprintf("data.%s", key),
+				OldValue:  value,
+				NewValue:  value,
+				Sensitive: true,
+			})
 		}
 	}
 
@@ -198,7 +206,15 @@ func CompareSecrets(oldSecret *Secret, newSecret *Secret) *SecretDiff {
 		Entries:   diffEntries,
 	}
 
-	if len(diffEntries) > 0 {
+	hasChanges := false
+	for _, entry := range diffEntries {
+		if entry.Type != SecretDiffTypeUnchanged {
+			hasChanges = true
+			break
+		}
+	}
+
+	if hasChanges {
 		diff.Type = SecretDiffTypeChanged
 		diff.Equal = false
 	} else {
@@ -209,7 +225,7 @@ func CompareSecrets(oldSecret *Secret, newSecret *Secret) *SecretDiff {
 	return &diff
 }
 
-func (d *SecretDiff) Print() {
+func (d *SecretDiff) Print(showUnchanged bool) {
 	combinedSecretName := d.Name
 	if d.Namespace != "" {
 		combinedSecretName = fmt.Sprintf("%s/%s", d.Namespace, d.Name)
@@ -217,6 +233,9 @@ func (d *SecretDiff) Print() {
 
 	printDetailedChanges := func() {
 		for _, entry := range d.Entries {
+			if entry.Type == SecretDiffTypeUnchanged && !showUnchanged {
+				continue
+			}
 			safeOldValue := entry.OldValue
 			safeNewValue := entry.NewValue
 			if entry.Sensitive && !util.GetCliContext().Bool("cleartext") {
@@ -230,6 +249,8 @@ func (d *SecretDiff) Print() {
 				println(color.Ize(color.Red, fmt.Sprintf("  - %s: %s", entry.Key, safeOldValue)))
 			case SecretDiffTypeChanged:
 				println(color.Ize(color.Yellow, fmt.Sprintf("  ~ %s: %s => %s", entry.Key, safeOldValue, safeNewValue)))
+			case SecretDiffTypeUnchanged:
+				println(color.Ize(color.Gray, fmt.Sprintf("  = %s: %s", entry.Key, safeNewValue)))
 			}
 		}
 	}

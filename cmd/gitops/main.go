@@ -8,6 +8,7 @@ import (
 	"github.com/mxcd/gitops-cli/internal/k8s"
 	"github.com/mxcd/gitops-cli/internal/kubernetes"
 	"github.com/mxcd/gitops-cli/internal/patch"
+	"github.com/mxcd/gitops-cli/internal/secret"
 	"github.com/mxcd/gitops-cli/internal/state"
 	"github.com/mxcd/gitops-cli/internal/templating"
 	"github.com/mxcd/gitops-cli/internal/util"
@@ -138,6 +139,15 @@ func main() {
 						Action: func(c *cli.Context) error {
 							initApplication(c)
 							return templating.TestTemplating(c)
+						},
+					},
+					{
+						Name:    "compare",
+						Aliases: []string{"c"},
+						Usage:   "Compare two secrets",
+						Action: func(c *cli.Context) error {
+							initApplication(c)
+							return secret.CompareCommand(c)
 						},
 					},
 				},

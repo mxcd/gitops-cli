@@ -45,7 +45,7 @@ func (p *Plan) Print(showUnchanged bool) {
 		if !showUnchanged && item.Diff.Equal {
 			continue
 		}
-		item.Diff.Print()
+		item.Diff.Print(false)
 		if i < len(p.Items)-1 {
 			println("---")
 		}
