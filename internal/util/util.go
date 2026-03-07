@@ -143,7 +143,11 @@ func ComputeRootDir(c *cli.Context) {
 		var err error
 		_rootDir, err = GetGitRepoRoot()
 		if err != nil {
-			log.Fatal(err)
+			log.Warn("Could not determine git repo root, falling back to current working directory")
+			_rootDir, err = os.Getwd()
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 		log.Trace("Using root directory: '", _rootDir, "'")
 
