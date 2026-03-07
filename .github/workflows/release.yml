@@ -70,7 +70,7 @@ jobs:
         id: docker_build
         uses: docker/build-push-action@v4
         with:
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: true
           build-args: |
             GITOPS_VERSION=${{ github.ref_name }}
