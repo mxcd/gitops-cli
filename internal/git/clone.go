@@ -68,6 +68,13 @@ func (c *Connection) CloneSsh(cloneProtocol CloneProtocol) error {
 	repositoryBaseUrl := strings.TrimPrefix(repositoryUrl, "ssh://")
 	repositoryBaseUrl = strings.TrimSuffix(repositoryBaseUrl, ".git")
 
+	// scp-style URLs (git@host:org/repo) use a colon before the path; inside an
+	// ssh:// URL the colon would be parsed as a port separator, so it must
+	// become a slash
+	if !strings.HasPrefix(repositoryUrl, "ssh://") {
+		repositoryBaseUrl = strings.Replace(repositoryBaseUrl, ":", "/", 1)
+	}
+
 	repositoryUrlSplit := strings.Split(repositoryBaseUrl, "@")
 	sshUsername := "git"
 	if c.Options.Authentication != nil && c.Options.Authentication.SshUsername != nil {
