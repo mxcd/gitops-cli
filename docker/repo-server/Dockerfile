@@ -12,7 +12,7 @@ WORKDIR /usr/src/cmd/repo-server
 RUN go build -o server -ldflags="-s -w" .
 
 FROM alpine:3.20
-RUN apk add --no-cache git
+RUN apk add --no-cache git openssh-client
 WORKDIR /usr/bin
 COPY --from=builder /usr/src/cmd/repo-server/server .
 ENTRYPOINT ["/usr/bin/server"]
