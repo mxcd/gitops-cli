@@ -48,6 +48,11 @@ func GetSecretFiles() ([]string, error) {
 				return nil;
 			}
 
+			if strings.HasPrefix(d.Name(), ".") {
+				// log.Trace("Skipping dotfile: ", path)
+				return nil;
+			}
+
 			if secretFileRegex.MatchString(path) {
 				log.Trace("Found secret file: ", path)				
 				relativePath, err := filepath.Rel(GetRootDir(), path)

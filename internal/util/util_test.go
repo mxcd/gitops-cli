@@ -1,6 +1,7 @@
 package util
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -15,6 +16,20 @@ func TestGetSecretFiles(t *testing.T) {
 	if len(secretFiles) == 0 {
 		t.Error("No secret files found")
 	}
+}
+
+func TestGetSecretFilesIgnoresDotfiles(t *testing.T) {
+	dir := t.TempDir()
+	assert.NoError(t, os.WriteFile(filepath.Join(dir, "foo.gitops.secret.enc.yml"), []byte("{}"), 0644))
+	assert.NoError(t, os.WriteFile(filepath.Join(dir, ".decrypted-foo.gitops.secret.enc.yml"), []byte("{}"), 0644))
+
+	previousRootDir := _rootDir
+	_rootDir = dir
+	defer func() { _rootDir = previousRootDir }()
+
+	secretFiles, err := GetSecretFiles()
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"foo.gitops.secret.enc.yml"}, secretFiles)
 }
 
 func TestGetGitRepoRoot(t *testing.T) {
