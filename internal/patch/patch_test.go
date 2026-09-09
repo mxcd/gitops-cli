@@ -23,6 +23,8 @@ func TestCleanRelativeFilePath(t *testing.T) {
 		{name: "parent traversal", filePath: "../values.yaml", expectError: true},
 		{name: "nested parent traversal", filePath: "a/../../values.yaml", expectError: true},
 		{name: "leading dash", filePath: "-flag.yaml", expectError: true},
+		{name: "leading dash hidden behind current directory", filePath: "./-flag.yaml", expectError: true},
+		{name: "leading dash hidden behind parent traversal", filePath: "a/../-flag.yaml", expectError: true},
 		{name: "current directory", filePath: ".", expectError: true},
 	}
 

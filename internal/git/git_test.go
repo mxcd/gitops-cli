@@ -7,6 +7,9 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/ldez/go-git-cmd-wrapper/v2/add"
+	"github.com/ldez/go-git-cmd-wrapper/v2/git"
+	"github.com/ldez/go-git-cmd-wrapper/v2/types"
 	"github.com/mxcd/gitops-cli/internal/util"
 	"github.com/stretchr/testify/assert"
 )
@@ -223,6 +226,46 @@ func TestGitRestore(t *testing.T) {
 	restoredContents, err := os.ReadFile(absoluteFilePath)
 	assert.NoError(t, err)
 	assert.Equal(t, string(originalContents), string(restoredContents))
+}
+
+func TestGitRestoreStagedChanges(t *testing.T) {
+
+	tempConnection := cloneTempRepository(t)
+	assert.NotNil(t, tempConnection)
+
+	relativeFilePath := path.Join("applications", "dev", "service-test", "values.yaml")
+	absoluteFilePath := path.Join(tempConnection.Options.Directory, relativeFilePath)
+
+	originalContents, err := os.ReadFile(absoluteFilePath)
+	assert.NoError(t, err)
+
+	// simulate a commit that failed after `git add` already staged the change
+	err = os.WriteFile(absoluteFilePath, []byte("clobbered: true\n"), 0644)
+	assert.NoError(t, err)
+	_, err = git.Add(runGitIn(tempConnection.Options.Directory), add.PathSpec(relativeFilePath))
+	assert.NoError(t, err)
+	assert.True(t, hasStagedChanges(t, tempConnection))
+
+	err = tempConnection.Restore([]string{relativeFilePath})
+	assert.NoError(t, err)
+
+	assert.False(t, hasStagedChanges(t, tempConnection))
+	hasChanges, err := tempConnection.HasChanges()
+	assert.NoError(t, err)
+	assert.False(t, hasChanges)
+
+	restoredContents, err := os.ReadFile(absoluteFilePath)
+	assert.NoError(t, err)
+	assert.Equal(t, string(originalContents), string(restoredContents))
+}
+
+// hasStagedChanges reports whether the index differs from HEAD.
+func hasStagedChanges(t *testing.T, connection *Connection) bool {
+	_, err := git.Raw("diff", runGitIn(connection.Options.Directory), func(g *types.Cmd) {
+		g.AddOptions("--cached")
+		g.AddOptions("--quiet")
+	})
+	return err != nil
 }
 
 func TestGitCommitFiles(t *testing.T) {

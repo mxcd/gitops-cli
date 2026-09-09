@@ -278,6 +278,35 @@ func (p *GitPatcher) Patch(patchTasks []PatchTask) error {
 	return p.pushWithRetry()
 }
 
+// pushPendingCommit handles a batch that did not change the working tree. If a
+// previous batch was committed but its push failed, the retried batch finds
+// nothing to change, so the pending local commit is pushed here and its id is
+// returned. Otherwise an empty id is returned.
+func (p *GitPatcher) pushPendingCommit() (string, error) {
+	head, err := p.GitConnection.RevParse("HEAD")
+	if err != nil {
+		return "", err
+	}
+
+	upstream, err := p.GitConnection.RevParse("origin/" + p.GitConnection.Options.Branch)
+	if err != nil {
+		return "", err
+	}
+
+	if head == upstream {
+		log.Info().Msg("No changes detected, nothing to commit")
+		return "", nil
+	}
+
+	log.Info().Msgf("No changes detected, but local commit %s has not been pushed yet, pushing", head)
+	if err := p.pushWithRetry(); err != nil {
+		log.Error().Err(err).Msgf("Failed to push pending commit %s, it remains local and is retried on the next patch", head)
+		return "", err
+	}
+
+	return head, nil
+}
+
 // PatchBatch applies all patches of the batch and commits them as a single
 // atomic commit. It returns the commit id, or an empty string if the batch did
 // not change anything.
@@ -328,8 +357,7 @@ func (p *GitPatcher) PatchBatch(batch PatchBatch) (hash string, err error) {
 	}
 
 	if !hasChanges {
-		log.Info().Msg("No changes detected, nothing to commit")
-		return "", nil
+		return p.pushPendingCommit()
 	}
 
 	log.Debug().Msg("Changes detected, committing")

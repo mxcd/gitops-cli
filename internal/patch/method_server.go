@@ -114,9 +114,9 @@ func (p *RepositoryServerPatcher) Patch(patchTasks []PatchTask) error {
 // PatchBatch sends all files of the batch to the repository server so they are
 // applied in a single commit. It returns the commit id reported by the server.
 func (p *RepositoryServerPatcher) PatchBatch(batch PatchBatch) (string, error) {
-	if len(batch.Files) == 0 {
-		log.Warn().Msg("No files provided, skipping patching")
-		return "", nil
+	// validate locally so an obviously invalid batch never reaches the server
+	if err := ValidatePatchBatch(batch); err != nil {
+		return "", err
 	}
 
 	body, err := p.doPut("/patches", batch)

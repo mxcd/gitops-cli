@@ -87,9 +87,9 @@ func TestRepositoryServerPatcherPatchBatchNoFiles(t *testing.T) {
 	}
 
 	commit, err := patcher.PatchBatch(PatchBatch{})
-	assert.NoError(t, err)
+	assert.ErrorIs(t, err, ErrInvalidPatchBatch)
 	assert.Empty(t, commit)
-	assert.Empty(t, recorded.Method, "no request must be sent for an empty batch")
+	assert.Empty(t, recorded.Method, "no request must be sent for an invalid batch")
 }
 
 func TestRepositoryServerPatcherPatchBatchServerError(t *testing.T) {
