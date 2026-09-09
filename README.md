@@ -474,11 +474,14 @@ The response contains the id of the created commit:
 
 If none of the patches changed anything, the request still succeeds and `commit` is empty.
 Requests are rejected with `400` and a descriptive error message if `files` is empty, if a file has
-no patches, if a selector is empty, if a file path is listed twice, or if a file path is absolute or
-points outside of the repository.
+no patches, if a selector is empty, if a file path is listed twice, if a file path is absolute or
+points outside of the repository, or if a file path is not a regular file (e.g. a symlink).
 If a single file of the request cannot be patched (e.g. the file does not exist or a selector does
-not match), the whole request fails with `500` and **no** file is changed.
+not match), the whole request fails with `500` and **no** file is changed. The same holds if the
+commit cannot be pushed, e.g. because it conflicts with a concurrent change: the server discards
+the commit, resets its clone to the remote branch and the caller retries the request.
 
 The `actor` is optional and added to the commit message as a `Triggered by:` footer.
 
-The single file endpoint `PUT /api/v1/patch` remains available and unchanged.
+The single file endpoint `PUT /api/v1/patch` remains available and behaves the same way for a
+single file.

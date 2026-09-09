@@ -197,7 +197,7 @@ func TestGitPullRebase(t *testing.T) {
 	assert.Equal(t, "test B", string(data))
 }
 
-func TestGitRestore(t *testing.T) {
+func TestGitResetToUpstream(t *testing.T) {
 
 	tempConnection := cloneTempRepository(t)
 	assert.NotNil(t, tempConnection)
@@ -205,58 +205,89 @@ func TestGitRestore(t *testing.T) {
 	relativeFilePath := path.Join("applications", "dev", "service-test", "values.yaml")
 	absoluteFilePath := path.Join(tempConnection.Options.Directory, relativeFilePath)
 
-	originalContents, err := os.ReadFile(absoluteFilePath)
+	upstreamHead, err := tempConnection.RevParse("origin/main")
 	assert.NoError(t, err)
-	assert.NotEmpty(t, originalContents)
 
+	// a local commit that was never pushed, plus a staged and an unstaged change on top
 	err = os.WriteFile(absoluteFilePath, []byte("clobbered: true\n"), 0644)
 	assert.NoError(t, err)
-
-	hasChanges, err := tempConnection.HasChanges()
+	localCommit, err := tempConnection.Commit([]string{relativeFilePath}, "local only")
 	assert.NoError(t, err)
-	assert.True(t, hasChanges)
+	assert.NotEqual(t, upstreamHead, localCommit)
 
-	err = tempConnection.Restore([]string{relativeFilePath})
-	assert.NoError(t, err)
-
-	hasChanges, err = tempConnection.HasChanges()
-	assert.NoError(t, err)
-	assert.False(t, hasChanges)
-
-	restoredContents, err := os.ReadFile(absoluteFilePath)
-	assert.NoError(t, err)
-	assert.Equal(t, string(originalContents), string(restoredContents))
-}
-
-func TestGitRestoreStagedChanges(t *testing.T) {
-
-	tempConnection := cloneTempRepository(t)
-	assert.NotNil(t, tempConnection)
-
-	relativeFilePath := path.Join("applications", "dev", "service-test", "values.yaml")
-	absoluteFilePath := path.Join(tempConnection.Options.Directory, relativeFilePath)
-
-	originalContents, err := os.ReadFile(absoluteFilePath)
-	assert.NoError(t, err)
-
-	// simulate a commit that failed after `git add` already staged the change
-	err = os.WriteFile(absoluteFilePath, []byte("clobbered: true\n"), 0644)
+	err = os.WriteFile(absoluteFilePath, []byte("clobbered: staged\n"), 0644)
 	assert.NoError(t, err)
 	_, err = git.Add(runGitIn(tempConnection.Options.Directory), add.PathSpec(relativeFilePath))
 	assert.NoError(t, err)
+	err = os.WriteFile(absoluteFilePath, []byte("clobbered: unstaged\n"), 0644)
+	assert.NoError(t, err)
 	assert.True(t, hasStagedChanges(t, tempConnection))
 
-	err = tempConnection.Restore([]string{relativeFilePath})
+	err = tempConnection.ResetToUpstream()
 	assert.NoError(t, err)
 
+	head, err := tempConnection.RevParse("HEAD")
+	assert.NoError(t, err)
+	assert.Equal(t, upstreamHead, head)
 	assert.False(t, hasStagedChanges(t, tempConnection))
 	hasChanges, err := tempConnection.HasChanges()
 	assert.NoError(t, err)
 	assert.False(t, hasChanges)
+}
 
-	restoredContents, err := os.ReadFile(absoluteFilePath)
+func TestGitResetToUpstreamAbortsRebase(t *testing.T) {
+
+	tempConnection := cloneTempRepository(t)
+	otherConnection := cloneTempRepository(t)
+
+	// a file of its own, so the shared fixture file stays untouched
+	relativeFilePath := "conflict-file-" + uuid.New().String()
+	err := os.WriteFile(path.Join(otherConnection.Options.Directory, relativeFilePath), []byte("conflict: none\n"), 0644)
 	assert.NoError(t, err)
-	assert.Equal(t, string(originalContents), string(restoredContents))
+	_, err = otherConnection.Commit([]string{relativeFilePath}, "seed conflict file")
+	assert.NoError(t, err)
+	assert.NoError(t, otherConnection.Push())
+	assert.NoError(t, tempConnection.Pull())
+
+	// upstream and the local clone change the same line
+	err = os.WriteFile(path.Join(otherConnection.Options.Directory, relativeFilePath), []byte("conflict: upstream\n"), 0644)
+	assert.NoError(t, err)
+	_, err = otherConnection.Commit([]string{relativeFilePath}, "upstream change")
+	assert.NoError(t, err)
+	assert.NoError(t, otherConnection.Push())
+
+	err = os.WriteFile(path.Join(tempConnection.Options.Directory, relativeFilePath), []byte("conflict: local\n"), 0644)
+	assert.NoError(t, err)
+	_, err = tempConnection.Commit([]string{relativeFilePath}, "local change")
+	assert.NoError(t, err)
+
+	// the rebase conflicts and leaves the clone mid-rebase
+	assert.Error(t, tempConnection.Pull())
+	assert.DirExists(t, path.Join(tempConnection.Options.Directory, ".git", "rebase-merge"))
+
+	assert.NoError(t, tempConnection.ResetToUpstream())
+
+	assert.NoDirExists(t, path.Join(tempConnection.Options.Directory, ".git", "rebase-merge"))
+	head, err := tempConnection.RevParse("HEAD")
+	assert.NoError(t, err)
+	upstreamHead, err := tempConnection.RevParse("origin/main")
+	assert.NoError(t, err)
+	assert.Equal(t, upstreamHead, head)
+	assert.NoError(t, tempConnection.Pull())
+}
+
+func TestGitRequireTracked(t *testing.T) {
+
+	tempConnection := cloneTempRepository(t)
+
+	tracked := path.Join("applications", "dev", "service-test", "values.yaml")
+	untracked := path.Join("applications", "dev", "service-test", "untracked.yaml")
+	err := os.WriteFile(path.Join(tempConnection.Options.Directory, untracked), []byte("untracked: true\n"), 0644)
+	assert.NoError(t, err)
+
+	assert.NoError(t, tempConnection.RequireTracked([]string{tracked}))
+	assert.Error(t, tempConnection.RequireTracked([]string{untracked}))
+	assert.Error(t, tempConnection.RequireTracked([]string{tracked, untracked}))
 }
 
 // hasStagedChanges reports whether the index differs from HEAD.

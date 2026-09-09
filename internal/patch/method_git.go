@@ -133,10 +133,15 @@ func (p *GitPatcher) preparePatchedFile(file FilePatch) (*patchedFile, error) {
 
 	absoluteFilePath := filepath.Join(p.GitConnection.Options.Directory, relativeFilePath)
 
-	fileStat, err := os.Stat(absoluteFilePath)
+	// Lstat, so a symlink is seen as such and cannot redirect the write to
+	// another file inside or outside of the repository
+	fileStat, err := os.Lstat(absoluteFilePath)
 	if err != nil {
 		log.Error().Err(err).Msgf("Failed to stat file %s", relativeFilePath)
 		return nil, fmt.Errorf("failed to stat file %s: %w", relativeFilePath, err)
+	}
+	if !fileStat.Mode().IsRegular() {
+		return nil, fmt.Errorf("%w: filePath '%s': is not a regular file", ErrInvalidPatchBatch, file.FilePath)
 	}
 
 	fileContents, err := os.ReadFile(absoluteFilePath)
@@ -179,29 +184,26 @@ func (p *GitPatcher) writePatchedFile(file *patchedFile) error {
 }
 
 // pushWithRetry pulls and pushes with a linear backoff to resolve races with
-// concurrent writers to the repository.
-func (p *GitPatcher) pushWithRetry() error {
-	executePush := func() error {
-		err := p.GitConnection.Pull()
-		if err != nil {
-			log.Error().Err(err).Msg("Error pulling prior to push")
-			return err
-		}
-		return p.GitConnection.Push()
-	}
-
+// concurrent writers to the repository. It returns the id of HEAD after the
+// push, which differs from the local commit id if the pull rebased it. A
+// failing pull is not retried: it means the rebase conflicts with upstream, and
+// waiting does not resolve that.
+func (p *GitPatcher) pushWithRetry() (string, error) {
 	var err error
 	for i := 0; i < pushRetryCount; i++ {
-		err = executePush()
-		if err == nil {
-			return nil
+		if err = p.GitConnection.Pull(); err != nil {
+			log.Error().Err(err).Msg("Error pulling prior to push")
+			return "", err
+		}
+		if err = p.GitConnection.Push(); err == nil {
+			return p.GitConnection.RevParse("HEAD")
 		}
 		if i < pushRetryCount-1 {
 			time.Sleep(time.Duration(i+1) * time.Second)
 		}
 	}
 
-	return err
+	return "", err
 }
 
 // buildCommitMessage builds the commit message for the given repository
@@ -224,99 +226,40 @@ func buildCommitMessage(relativeFilePaths []string, actor string) string {
 	return message
 }
 
+// Patch applies the given tasks as a single batch, see PatchBatch.
 func (p *GitPatcher) Patch(patchTasks []PatchTask) error {
-
-	err := p.GitConnection.Pull()
-	if err != nil {
-		return err
-	}
-
-	commitCount := 0
-
+	batch := PatchBatch{Files: make([]FilePatch, 0, len(patchTasks))}
 	for _, patchTask := range patchTasks {
-		preparedFile, err := p.preparePatchedFile(FilePatch{
-			FilePath: patchTask.FilePath,
-			Patches:  patchTask.Patches,
-		})
-		if err != nil {
-			return err
+		if batch.Actor == "" {
+			batch.Actor = patchTask.Actor
 		}
-
-		if err := p.writePatchedFile(preparedFile); err != nil {
-			return err
-		}
-
-		log.Debug().Msg("checking for changes")
-		hasChanges, err := p.GitConnection.HasChanges()
-		if err != nil {
-			return err
-		}
-
-		if !hasChanges {
-			log.Info().Msgf("No changes detected for %s, skipping commit", preparedFile.RelativePath)
-			continue
-		}
-
-		log.Debug().Msg("Changes detected, committing")
-
-		commitHash, err := p.GitConnection.Commit(
-			[]string{preparedFile.RelativePath},
-			buildCommitMessage([]string{preparedFile.RelativePath}, patchTask.Actor),
-		)
-		if err != nil {
-			return err
-		}
-		commitCount++
-		log.Info().Msgf("Created patch commit: %s", commitHash)
+		batch.Files = append(batch.Files, FilePatch{FilePath: patchTask.FilePath, Patches: patchTask.Patches})
 	}
 
-	if commitCount == 0 {
-		log.Info().Msg("No changes detected, nothing to push")
-		return nil
-	}
-
-	return p.pushWithRetry()
-}
-
-// pushPendingCommit handles a batch that did not change the working tree. If a
-// previous batch was committed but its push failed, the retried batch finds
-// nothing to change, so the pending local commit is pushed here and its id is
-// returned. Otherwise an empty id is returned.
-func (p *GitPatcher) pushPendingCommit() (string, error) {
-	head, err := p.GitConnection.RevParse("HEAD")
-	if err != nil {
-		return "", err
-	}
-
-	upstream, err := p.GitConnection.RevParse("origin/" + p.GitConnection.Options.Branch)
-	if err != nil {
-		return "", err
-	}
-
-	if head == upstream {
-		log.Info().Msg("No changes detected, nothing to commit")
-		return "", nil
-	}
-
-	log.Info().Msgf("No changes detected, but local commit %s has not been pushed yet, pushing", head)
-	if err := p.pushWithRetry(); err != nil {
-		log.Error().Err(err).Msgf("Failed to push pending commit %s, it remains local and is retried on the next patch", head)
-		return "", err
-	}
-
-	return head, nil
+	_, err := p.PatchBatch(batch)
+	return err
 }
 
 // PatchBatch applies all patches of the batch and commits them as a single
 // atomic commit. It returns the commit id, or an empty string if the batch did
-// not change anything.
+// not change anything. Any failure resets the clone to the remote branch, so
+// nothing is ever left half written, staged or committed but unpushed.
 func (p *GitPatcher) PatchBatch(batch PatchBatch) (hash string, err error) {
 
 	if err := ValidatePatchBatch(batch); err != nil {
 		return "", err
 	}
 
-	if err := p.GitConnection.Pull(); err != nil {
+	defer func() {
+		if err != nil {
+			log.Warn().Msg("Resetting clone to the remote branch after failed batch patch")
+			if resetErr := p.GitConnection.ResetToUpstream(); resetErr != nil {
+				log.Error().Err(resetErr).Msg("Failed to reset clone after failed batch patch")
+			}
+		}
+	}()
+
+	if err = p.GitConnection.Pull(); err != nil {
 		return "", err
 	}
 
@@ -333,18 +276,12 @@ func (p *GitPatcher) PatchBatch(batch PatchBatch) (hash string, err error) {
 		relativeFilePaths = append(relativeFilePaths, preparedFile.RelativePath)
 	}
 
-	filesWritten := false
-	defer func() {
-		if err != nil && filesWritten {
-			log.Warn().Msg("Restoring working tree after failed batch patch")
-			if restoreErr := p.GitConnection.Restore(relativeFilePaths); restoreErr != nil {
-				log.Error().Err(restoreErr).Msg("Failed to restore working tree after failed batch patch")
-			}
-		}
-	}()
+	// an untracked file would be written but never committed
+	if err = p.GitConnection.RequireTracked(relativeFilePaths); err != nil {
+		return "", err
+	}
 
 	for _, preparedFile := range preparedFiles {
-		filesWritten = true
 		if err = p.writePatchedFile(preparedFile); err != nil {
 			return "", err
 		}
@@ -357,24 +294,21 @@ func (p *GitPatcher) PatchBatch(batch PatchBatch) (hash string, err error) {
 	}
 
 	if !hasChanges {
-		return p.pushPendingCommit()
+		log.Info().Msg("No changes detected, nothing to commit")
+		return "", nil
 	}
 
 	log.Debug().Msg("Changes detected, committing")
 
-	hash, err = p.GitConnection.Commit(relativeFilePaths, buildCommitMessage(relativeFilePaths, batch.Actor))
+	localHash, err := p.GitConnection.Commit(relativeFilePaths, buildCommitMessage(relativeFilePaths, batch.Actor))
 	if err != nil {
 		return "", err
 	}
+	log.Info().Msgf("Created patch commit: %s", localHash)
 
-	// the changes are committed, so the working tree is clean and must not be
-	// restored if the push fails. The commit stays local and is pushed by the
-	// next pull/push cycle
-	filesWritten = false
-	log.Info().Msgf("Created patch commit: %s", hash)
-
-	if err = p.pushWithRetry(); err != nil {
-		log.Error().Err(err).Msgf("Failed to push commit %s, it remains local and is retried on the next patch", hash)
+	hash, err = p.pushWithRetry()
+	if err != nil {
+		log.Error().Err(err).Msgf("Failed to push commit %s, discarding it", localHash)
 		return "", err
 	}
 

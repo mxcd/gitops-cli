@@ -25,6 +25,8 @@ func TestCleanRelativeFilePath(t *testing.T) {
 		{name: "leading dash", filePath: "-flag.yaml", expectError: true},
 		{name: "leading dash hidden behind current directory", filePath: "./-flag.yaml", expectError: true},
 		{name: "leading dash hidden behind parent traversal", filePath: "a/../-flag.yaml", expectError: true},
+		{name: "leading colon pathspec magic", filePath: ":!values.yaml", expectError: true},
+		{name: "leading colon hidden behind current directory", filePath: "./:(top)values.yaml", expectError: true},
 		{name: "current directory", filePath: ".", expectError: true},
 	}
 

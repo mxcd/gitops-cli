@@ -208,6 +208,16 @@ func TestPatchRouteStillWorks(t *testing.T) {
 	assert.Empty(t, patcher.PatchBatchCalls)
 }
 
+func TestPatchRouteValidationError(t *testing.T) {
+	patcher := &fakePatcher{Err: patch.ErrInvalidPatchBatch}
+	server := newTestServer(t, patcher)
+
+	body := `{"filePath": "../escape.yaml", "patches": [{"selector": ".service.image.tag", "value": "v1.0.0"}]}`
+	recorder := executeRequest(t, server, http.MethodPut, "/api/v1/patch", body, "test-api-key")
+	assert.Equal(t, 400, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), patch.ErrInvalidPatchBatch.Error())
+}
+
 func TestHealthRouteIsUnprotected(t *testing.T) {
 	server := newTestServer(t, &fakePatcher{})
 

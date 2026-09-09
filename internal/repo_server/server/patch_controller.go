@@ -1,8 +1,11 @@
 package server
 
 import (
+	"errors"
+
 	"github.com/gin-gonic/gin"
 	"github.com/mxcd/gitops-cli/internal/patch"
+	"github.com/rs/zerolog/log"
 )
 
 func (s *Server) registerPatchRoute() error {
@@ -23,6 +26,11 @@ func (s *Server) getPatchHandler() gin.HandlerFunc {
 
 		err := s.GitPatcher.Patch([]patch.PatchTask{input})
 		if err != nil {
+			if errors.Is(err, patch.ErrInvalidPatchBatch) {
+				c.JSON(400, gin.H{"error": err.Error()})
+				return
+			}
+			log.Error().Err(err).Msg("Error executing patching")
 			c.JSON(500, gin.H{"error": "error executing patching"})
 			return
 		}

@@ -84,10 +84,20 @@ func seedFixtureFile(t *testing.T, patcher *GitPatcher) string {
 	_, err = patcher.GitConnection.Commit([]string{relativeFilePath}, "test: seed "+relativeFilePath)
 	assert.NoError(t, err)
 
-	err = patcher.pushWithRetry()
+	_, err = patcher.pushWithRetry()
 	assert.NoError(t, err)
 
 	return relativeFilePath
+}
+
+// assertCommitOnRemote asserts that the commit exists in an independent clone
+// and contains exactly the given files.
+func assertCommitOnRemote(t *testing.T, commitHash string, relativeFilePaths ...string) *GitPatcher {
+	verificationPatcher := newTestPatcher(t)
+	committedFiles, err := verificationPatcher.GitConnection.CommitFiles(commitHash)
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, relativeFilePaths, committedFiles)
+	return verificationPatcher
 }
 
 func readRepositoryFile(t *testing.T, connection *git.Connection, relativeFilePath string) string {
@@ -151,11 +161,7 @@ func TestGitSshPatchBatch(t *testing.T) {
 	assert.ElementsMatch(t, []string{relativeFilePathA, relativeFilePathB}, committedFiles)
 
 	// the changes must be visible in an independent clone of the repository
-	verificationPatcher := newTestPatcher(t)
-	resolvedCommitHash, err := verificationPatcher.GitConnection.RevParse(commitHash)
-	assert.NoError(t, err)
-	assert.Equal(t, commitHash, resolvedCommitHash)
-
+	verificationPatcher := assertCommitOnRemote(t, commitHash, relativeFilePathA, relativeFilePathB)
 	assert.Contains(t, readRepositoryFile(t, verificationPatcher.GitConnection, relativeFilePathA), "tag: v2.0.0")
 	assert.Contains(t, readRepositoryFile(t, verificationPatcher.GitConnection, relativeFilePathB), "namespace: batch-namespace")
 }
@@ -199,39 +205,126 @@ func TestGitSshPatchBatchNoChanges(t *testing.T) {
 	assert.Empty(t, commitHash)
 }
 
-func TestGitSshPatchBatchPushesPendingLocalCommit(t *testing.T) {
+func TestGitSshPatchBatchConflictingUpstreamCommitResetsClone(t *testing.T) {
 	patcher := newTestPatcher(t)
 
 	relativeFilePath := seedFixtureFile(t, patcher)
+	otherRelativeFilePath := seedFixtureFile(t, patcher)
 
-	batch := PatchBatch{
-		Files: []FilePatch{
-			{FilePath: relativeFilePath, Patches: []Patch{{Selector: ".service.image.tag", Value: "v9.0.0"}}},
-		},
-	}
-
-	// simulate a batch whose push failed: the change is committed locally only
-	preparedFile, err := patcher.preparePatchedFile(batch.Files[0])
+	// simulate a batch whose push failed and left a local commit behind
+	preparedFile, err := patcher.preparePatchedFile(FilePatch{FilePath: relativeFilePath, Patches: []Patch{{Selector: ".service.image.tag", Value: "v9.0.0-local"}}})
 	assert.NoError(t, err)
 	assert.NoError(t, patcher.writePatchedFile(preparedFile))
-	localCommitHash, err := patcher.GitConnection.Commit([]string{relativeFilePath}, "local only")
+	_, err = patcher.GitConnection.Commit([]string{relativeFilePath}, "local only")
 	assert.NoError(t, err)
 
-	// retrying the same batch finds nothing to change but must push the pending commit
-	commitHash, err := patcher.PatchBatch(batch)
+	// meanwhile upstream changes the same line
+	otherPatcher := newTestPatcher(t)
+	upstreamHash, err := otherPatcher.PatchBatch(PatchBatch{
+		Files: []FilePatch{{FilePath: relativeFilePath, Patches: []Patch{{Selector: ".service.image.tag", Value: "v9.0.0-upstream"}}}},
+	})
 	assert.NoError(t, err)
-	assert.Equal(t, localCommitHash, commitHash)
+	assert.NotEmpty(t, upstreamHash)
 
-	verificationPatcher := newTestPatcher(t)
-	resolvedCommitHash, err := verificationPatcher.GitConnection.RevParse(commitHash)
-	assert.NoError(t, err)
-	assert.Equal(t, commitHash, resolvedCommitHash)
-	assert.Contains(t, readRepositoryFile(t, verificationPatcher.GitConnection, relativeFilePath), "tag: v9.0.0")
-
-	// a further retry has nothing left to push
-	commitHash, err = patcher.PatchBatch(batch)
-	assert.NoError(t, err)
+	// the next batch cannot rebase, fails, and must leave a clean clone behind
+	commitHash, err := patcher.PatchBatch(PatchBatch{
+		Files: []FilePatch{{FilePath: otherRelativeFilePath, Patches: []Patch{{Selector: ".service.image.tag", Value: "v9.0.1"}}}},
+	})
+	assert.Error(t, err)
 	assert.Empty(t, commitHash)
+	assert.NoDirExists(t, path.Join(patcher.GitConnection.Options.Directory, ".git", "rebase-merge"))
+	hasChanges, err := patcher.GitConnection.HasChanges()
+	assert.NoError(t, err)
+	assert.False(t, hasChanges)
+	assert.Contains(t, readRepositoryFile(t, patcher.GitConnection, relativeFilePath), "tag: v9.0.0-upstream")
+
+	// the clone is usable again
+	commitHash, err = patcher.PatchBatch(PatchBatch{
+		Files: []FilePatch{{FilePath: otherRelativeFilePath, Patches: []Patch{{Selector: ".service.image.tag", Value: "v9.0.1"}}}},
+	})
+	assert.NoError(t, err)
+	assert.NotEmpty(t, commitHash)
+	assertCommitOnRemote(t, commitHash, otherRelativeFilePath)
+}
+
+func TestGitSshPatchBatchReturnsRebasedCommit(t *testing.T) {
+	patcher := newTestPatcher(t)
+	otherPatcher := newTestPatcher(t)
+
+	relativeFilePath := seedFixtureFile(t, patcher)
+	otherRelativeFilePath := seedFixtureFile(t, patcher)
+	assert.NoError(t, otherPatcher.GitConnection.Pull())
+
+	// commit locally, then let upstream move before the push
+	preparedFile, err := patcher.preparePatchedFile(FilePatch{FilePath: relativeFilePath, Patches: []Patch{{Selector: ".service.image.tag", Value: "v10.0.0"}}})
+	assert.NoError(t, err)
+	assert.NoError(t, patcher.writePatchedFile(preparedFile))
+	localHash, err := patcher.GitConnection.Commit([]string{relativeFilePath}, "rebased later")
+	assert.NoError(t, err)
+
+	_, err = otherPatcher.PatchBatch(PatchBatch{
+		Files: []FilePatch{{FilePath: otherRelativeFilePath, Patches: []Patch{{Selector: ".service.image.tag", Value: "v10.0.1"}}}},
+	})
+	assert.NoError(t, err)
+
+	pushedHash, err := patcher.pushWithRetry()
+	assert.NoError(t, err)
+	assert.NotEqual(t, localHash, pushedHash)
+	assertCommitOnRemote(t, pushedHash, relativeFilePath)
+}
+
+func TestGitSshPatchBatchSymlinkRejected(t *testing.T) {
+	patcher := newTestPatcher(t)
+
+	relativeFilePath := seedFixtureFile(t, patcher)
+	originalContents := readRepositoryFile(t, patcher.GitConnection, relativeFilePath)
+
+	// a committed symlink next to the fixture pointing at it
+	linkRelativePath := path.Join(path.Dir(relativeFilePath), "link.yaml")
+	err := os.Symlink("values.yaml", path.Join(patcher.GitConnection.Options.Directory, linkRelativePath))
+	assert.NoError(t, err)
+	_, err = patcher.GitConnection.Commit([]string{linkRelativePath}, "test: symlink")
+	assert.NoError(t, err)
+	_, err = patcher.pushWithRetry()
+	assert.NoError(t, err)
+
+	commitHash, err := patcher.PatchBatch(PatchBatch{
+		Files: []FilePatch{{FilePath: linkRelativePath, Patches: []Patch{{Selector: ".service.image.tag", Value: "v11.0.0"}}}},
+	})
+	assert.ErrorIs(t, err, ErrInvalidPatchBatch)
+	assert.Empty(t, commitHash)
+
+	// the link target must not have been written through
+	assert.Equal(t, originalContents, readRepositoryFile(t, patcher.GitConnection, relativeFilePath))
+	hasChanges, err := patcher.GitConnection.HasChanges()
+	assert.NoError(t, err)
+	assert.False(t, hasChanges)
+}
+
+func TestGitSshPatchBatchUntrackedFileRejected(t *testing.T) {
+	patcher := newTestPatcher(t)
+
+	relativeFilePath := seedFixtureFile(t, patcher)
+	untrackedRelativePath := path.Join(path.Dir(relativeFilePath), "untracked.yaml")
+	untrackedAbsolutePath := path.Join(patcher.GitConnection.Options.Directory, untrackedRelativePath)
+	originalContents := readRepositoryFile(t, patcher.GitConnection, relativeFilePath)
+	assert.NoError(t, os.WriteFile(untrackedAbsolutePath, []byte(originalContents), 0644))
+
+	commitHash, err := patcher.PatchBatch(PatchBatch{
+		Files: []FilePatch{
+			{FilePath: relativeFilePath, Patches: []Patch{{Selector: ".service.image.tag", Value: "v12.0.0"}}},
+			{FilePath: untrackedRelativePath, Patches: []Patch{{Selector: ".service.image.tag", Value: "v12.0.0"}}},
+		},
+	})
+	assert.Error(t, err)
+	assert.Empty(t, commitHash)
+
+	// nothing is written when a file of the batch is not tracked
+	assert.Equal(t, originalContents, readRepositoryFile(t, patcher.GitConnection, relativeFilePath))
+	assert.Equal(t, originalContents, readRepositoryFile(t, patcher.GitConnection, untrackedRelativePath))
+	hasChanges, err := patcher.GitConnection.HasChanges()
+	assert.NoError(t, err)
+	assert.False(t, hasChanges)
 }
 
 func TestGitSshPatchBatchMissingFile(t *testing.T) {

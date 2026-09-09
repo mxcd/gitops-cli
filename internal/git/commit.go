@@ -3,7 +3,6 @@ package git
 import (
 	"fmt"
 
-	"github.com/ldez/go-git-cmd-wrapper/v2/add"
 	"github.com/ldez/go-git-cmd-wrapper/v2/commit"
 	"github.com/ldez/go-git-cmd-wrapper/v2/config"
 	"github.com/ldez/go-git-cmd-wrapper/v2/git"
@@ -18,7 +17,12 @@ func (c *Connection) Commit(files []string, message string) (string, error) {
 		return "", fmt.Errorf("directory is not specified")
 	}
 
-	msg, err := git.Add(runGitIn(directory), add.PathSpec(files...))
+	msg, err := git.Add(runGitIn(directory), func(g *types.Cmd) {
+		g.AddOptions("--")
+		for _, file := range files {
+			g.AddOptions(file)
+		}
+	})
 	if err != nil {
 		log.Error().Err(err).Str("output", msg).Msg("Failed to add files")
 		return "", err
