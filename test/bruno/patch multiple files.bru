@@ -1,0 +1,43 @@
+meta {
+  name: patch multiple files
+  type: http
+  seq: 4
+}
+
+put {
+  url: http://localhost:8080/api/v1/patches
+  body: json
+  auth: apikey
+}
+
+auth:apikey {
+  key: X-API-Key
+  value: test
+  placement: header
+}
+
+body:json {
+  {
+    "actor": "ci-bot",
+    "files": [
+      {
+        "filePath": "applications/dev/service-foo/values.yaml",
+        "patches": [
+          {
+            "selector": ".service.image.tag",
+            "value": "v1.1.1"
+          }
+        ]
+      },
+      {
+        "filePath": "applications/dev/service-bar/values.yaml",
+        "patches": [
+          {
+            "selector": ".service.image.tag",
+            "value": "v1.1.1"
+          }
+        ]
+      }
+    ]
+  }
+}

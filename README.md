@@ -430,3 +430,55 @@ curl --request PUT \
 # Evaluates the previously exported env vars GITOPS_REPOSITORY_SERVER and GITOPS_REPOSITORY_SERVER_API_KEY
 gitops patch applications/dev/service-foo/values.yaml .service.image.tag v42.0.1
 ```
+
+#### Patching multiple files atomically
+To patch more than one file, use `PUT <protocol>://<host>:<port>/api/v1/patches`.
+All patches of the request are applied and committed as a **single commit**, which is useful for
+matrix builds that update several services of the same release at once.
+
+```bash
+curl --request PUT \
+  --url $GITOPS_REPOSITORY_SERVER/patches \
+  --header 'content-type: application/json' \
+  --header "X-API-Key: $GITOPS_REPOSITORY_SERVER_API_KEY" \
+  --data '{
+  "actor": "ci-bot",
+  "files": [
+    {
+      "filePath": "applications/dev/service-foo/values.yaml",
+      "patches": [
+        {
+          "selector": ".service.image.tag",
+          "value": "v42.0.1"
+        }
+      ]
+    },
+    {
+      "filePath": "applications/dev/service-bar/values.yaml",
+      "patches": [
+        {
+          "selector": ".service.image.tag",
+          "value": "v42.0.1"
+        }
+      ]
+    }
+  ]
+}'
+```
+
+The response contains the id of the created commit:
+
+```json
+{ "message": "ok", "commit": "8f1c0a2e2a3b4c5d6e7f8091a2b3c4d5e6f70819" }
+```
+
+If none of the patches changed anything, the request still succeeds and `commit` is empty.
+Requests are rejected with `400` and a descriptive error message if `files` is empty, if a file has
+no patches, if a selector is empty, if a file path is listed twice, or if a file path is absolute or
+points outside of the repository.
+If a single file of the request cannot be patched (e.g. the file does not exist or a selector does
+not match), the whole request fails with `500` and **no** file is changed.
+
+The `actor` is optional and added to the commit message as a `Triggered by:` footer.
+
+The single file endpoint `PUT /api/v1/patch` remains available and unchanged.

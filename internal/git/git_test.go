@@ -193,3 +193,65 @@ func TestGitPullRebase(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "test B", string(data))
 }
+
+func TestGitRestore(t *testing.T) {
+
+	tempConnection := cloneTempRepository(t)
+	assert.NotNil(t, tempConnection)
+
+	relativeFilePath := path.Join("applications", "dev", "service-test", "values.yaml")
+	absoluteFilePath := path.Join(tempConnection.Options.Directory, relativeFilePath)
+
+	originalContents, err := os.ReadFile(absoluteFilePath)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, originalContents)
+
+	err = os.WriteFile(absoluteFilePath, []byte("clobbered: true\n"), 0644)
+	assert.NoError(t, err)
+
+	hasChanges, err := tempConnection.HasChanges()
+	assert.NoError(t, err)
+	assert.True(t, hasChanges)
+
+	err = tempConnection.Restore([]string{relativeFilePath})
+	assert.NoError(t, err)
+
+	hasChanges, err = tempConnection.HasChanges()
+	assert.NoError(t, err)
+	assert.False(t, hasChanges)
+
+	restoredContents, err := os.ReadFile(absoluteFilePath)
+	assert.NoError(t, err)
+	assert.Equal(t, string(originalContents), string(restoredContents))
+}
+
+func TestGitCommitFiles(t *testing.T) {
+
+	tempConnection := cloneTempRepository(t)
+	assert.NotNil(t, tempConnection)
+
+	headBefore, err := tempConnection.RevParse("HEAD")
+	assert.NoError(t, err)
+	assert.NotEmpty(t, headBefore)
+
+	testFileNameA := "test-file-" + uuid.New().String()
+	testFileNameB := "test-file-" + uuid.New().String()
+
+	for _, testFileName := range []string{testFileNameA, testFileNameB} {
+		err = os.WriteFile(path.Join(tempConnection.Options.Directory, testFileName), []byte("test"), 0644)
+		assert.NoError(t, err)
+	}
+
+	hash, err := tempConnection.Commit([]string{testFileNameA, testFileNameB}, "Test commit with two files")
+	assert.NoError(t, err)
+	assert.NotEmpty(t, hash)
+
+	files, err := tempConnection.CommitFiles(hash)
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []string{testFileNameA, testFileNameB}, files)
+
+	// the commit must sit directly on top of the previously resolved HEAD
+	parent, err := tempConnection.RevParse(hash + "^")
+	assert.NoError(t, err)
+	assert.Equal(t, headBefore, parent)
+}

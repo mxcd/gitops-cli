@@ -1,8 +1,6 @@
 package server
 
 import (
-	"sync"
-
 	"github.com/gin-gonic/gin"
 	"github.com/mxcd/gitops-cli/internal/patch"
 )
@@ -13,8 +11,6 @@ func (s *Server) registerPatchRoute() error {
 }
 
 func (s *Server) getPatchHandler() gin.HandlerFunc {
-	lock := sync.Mutex{}
-
 	return func(c *gin.Context) {
 		var input patch.PatchTask
 		if err := c.ShouldBindJSON(&input); err != nil {
@@ -22,8 +18,8 @@ func (s *Server) getPatchHandler() gin.HandlerFunc {
 			return
 		}
 
-		lock.Lock()
-		defer lock.Unlock()
+		s.patchLock.Lock()
+		defer s.patchLock.Unlock()
 
 		err := s.GitPatcher.Patch([]patch.PatchTask{input})
 		if err != nil {
