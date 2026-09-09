@@ -2,8 +2,9 @@ package patch
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
-	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/mxcd/gitops-cli/internal/git"
@@ -12,6 +13,9 @@ import (
 
 	"github.com/rs/zerolog/log"
 )
+
+// pushRetryCount is the number of pull/push attempts before giving up.
+const pushRetryCount = 5
 
 type GitPatcherOptions struct {
 	GitConnectionOptions *git.ConnectionOptions
@@ -109,6 +113,117 @@ func (p *GitPatcher) Prepare(options *PrepareOptions) error {
 	return nil
 }
 
+// patchedFile holds the fully patched contents of a single file before it is
+// written to disk.
+type patchedFile struct {
+	RelativePath string
+	AbsolutePath string
+	Mode         fs.FileMode
+	Contents     []byte
+}
+
+// preparePatchedFile reads a file and applies all of its patches in memory. No
+// changes are written to disk, so a failing file never leaves a partially
+// patched working tree behind.
+func (p *GitPatcher) preparePatchedFile(file FilePatch) (*patchedFile, error) {
+	relativeFilePath, err := cleanRelativeFilePath(file.FilePath)
+	if err != nil {
+		return nil, fmt.Errorf("%w: filePath '%s': %s", ErrInvalidPatchBatch, file.FilePath, err.Error())
+	}
+
+	absoluteFilePath := filepath.Join(p.GitConnection.Options.Directory, relativeFilePath)
+
+	fileStat, err := os.Stat(absoluteFilePath)
+	if err != nil {
+		log.Error().Err(err).Msgf("Failed to stat file %s", relativeFilePath)
+		return nil, fmt.Errorf("failed to stat file %s: %w", relativeFilePath, err)
+	}
+
+	fileContents, err := os.ReadFile(absoluteFilePath)
+	if err != nil {
+		log.Error().Err(err).Msgf("Failed to read file %s", relativeFilePath)
+		return nil, fmt.Errorf("failed to read file %s: %w", relativeFilePath, err)
+	}
+
+	log.Debug().Msgf("original yaml file: %s", string(fileContents))
+
+	for _, filePatch := range file.Patches {
+		selector := filePatch.Selector
+		value := filePatch.Value
+
+		log.Debug().Msgf("patching file '%s' with selector '%s' and value '%s'", relativeFilePath, selector, value)
+		patchedData, err := yaml.PatchYaml(fileContents, selector, value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to patch file %s with selector '%s': %w", relativeFilePath, selector, err)
+		}
+		log.Debug().Msgf("patched yaml file:\n%s", string(patchedData))
+
+		fileContents = patchedData
+	}
+
+	return &patchedFile{
+		RelativePath: relativeFilePath,
+		AbsolutePath: absoluteFilePath,
+		Mode:         fileStat.Mode(),
+		Contents:     fileContents,
+	}, nil
+}
+
+// writePatchedFile writes the patched contents back to disk.
+func (p *GitPatcher) writePatchedFile(file *patchedFile) error {
+	if err := os.WriteFile(file.AbsolutePath, file.Contents, file.Mode); err != nil {
+		log.Error().Err(err).Msgf("Failed to write file %s", file.RelativePath)
+		return fmt.Errorf("failed to write file %s: %w", file.RelativePath, err)
+	}
+	return nil
+}
+
+// pushWithRetry pulls and pushes with a linear backoff to resolve races with
+// concurrent writers to the repository.
+func (p *GitPatcher) pushWithRetry() error {
+	executePush := func() error {
+		err := p.GitConnection.Pull()
+		if err != nil {
+			log.Error().Err(err).Msg("Error pulling prior to push")
+			return err
+		}
+		return p.GitConnection.Push()
+	}
+
+	var err error
+	for i := 0; i < pushRetryCount; i++ {
+		err = executePush()
+		if err == nil {
+			return nil
+		}
+		if i < pushRetryCount-1 {
+			time.Sleep(time.Duration(i+1) * time.Second)
+		}
+	}
+
+	return err
+}
+
+// buildCommitMessage builds the commit message for the given repository
+// relative file paths.
+func buildCommitMessage(relativeFilePaths []string, actor string) string {
+	var message string
+	if len(relativeFilePaths) == 1 {
+		message = fmt.Sprintf("feat(gitops): patching %s", relativeFilePaths[0])
+	} else {
+		message = fmt.Sprintf("feat(gitops): patching %d files\n", len(relativeFilePaths))
+		for _, relativeFilePath := range relativeFilePaths {
+			message += fmt.Sprintf("\n- %s", relativeFilePath)
+		}
+	}
+
+	if actor != "" {
+		message += fmt.Sprintf("\n\nTriggered by: %s", actor)
+	}
+
+	return message
+}
+
 func (p *GitPatcher) Patch(patchTasks []PatchTask) error {
 
 	err := p.GitConnection.Pull()
@@ -116,41 +231,18 @@ func (p *GitPatcher) Patch(patchTasks []PatchTask) error {
 		return err
 	}
 
+	commitCount := 0
+
 	for _, patchTask := range patchTasks {
-		relativeFilePath := patchTask.FilePath
-
-		absoluteFilePath := path.Join(p.GitConnection.Options.Directory, relativeFilePath)
-
-		fileStat, err := os.Stat(absoluteFilePath)
+		preparedFile, err := p.preparePatchedFile(FilePatch{
+			FilePath: patchTask.FilePath,
+			Patches:  patchTask.Patches,
+		})
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to stat file")
-		}
-
-		fileContents, err := os.ReadFile(absoluteFilePath)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to read file")
 			return err
 		}
 
-		log.Debug().Msgf("original yaml file: %s", string(fileContents))
-
-		for _, patch := range patchTask.Patches {
-			selector := patch.Selector
-			value := patch.Value
-
-			log.Debug().Msgf("patching file with selector '%s' and value '%s'", selector, value)
-			patchedData, err := yaml.PatchYaml(fileContents, selector, value)
-			if err != nil {
-				return err
-			}
-			log.Debug().Msgf("patched yaml file:\n%s", string(patchedData))
-
-			fileContents = patchedData
-		}
-
-		err = os.WriteFile(absoluteFilePath, fileContents, fileStat.Mode())
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to write file")
+		if err := p.writePatchedFile(preparedFile); err != nil {
 			return err
 		}
 
@@ -161,41 +253,102 @@ func (p *GitPatcher) Patch(patchTasks []PatchTask) error {
 		}
 
 		if !hasChanges {
-			log.Info().Msg("No changes detected, exiting")
-			return nil
-		} else {
-			log.Debug().Msg("Changes detected, committing")
+			log.Info().Msgf("No changes detected for %s, skipping commit", preparedFile.RelativePath)
+			continue
 		}
 
-		commitFooter := ""
+		log.Debug().Msg("Changes detected, committing")
 
-		if patchTask.Actor != "" {
-			commitFooter = fmt.Sprintf("\n\nTriggered by: %s", patchTask.Actor)
-		}
-
-		commitHash, err := p.GitConnection.Commit([]string{relativeFilePath}, fmt.Sprintf("feat(gitops): patching %s%s", relativeFilePath, commitFooter))
+		commitHash, err := p.GitConnection.Commit(
+			[]string{preparedFile.RelativePath},
+			buildCommitMessage([]string{preparedFile.RelativePath}, patchTask.Actor),
+		)
 		if err != nil {
 			return err
 		}
+		commitCount++
 		log.Info().Msgf("Created patch commit: %s", commitHash)
 	}
 
-	executePush := func() error {
-		err := p.GitConnection.Pull()
+	if commitCount == 0 {
+		log.Info().Msg("No changes detected, nothing to push")
+		return nil
+	}
+
+	return p.pushWithRetry()
+}
+
+// PatchBatch applies all patches of the batch and commits them as a single
+// atomic commit. It returns the commit id, or an empty string if the batch did
+// not change anything.
+func (p *GitPatcher) PatchBatch(batch PatchBatch) (hash string, err error) {
+
+	if err := ValidatePatchBatch(batch); err != nil {
+		return "", err
+	}
+
+	if err := p.GitConnection.Pull(); err != nil {
+		return "", err
+	}
+
+	// patch all files in memory first, so that a failure of any file does not
+	// leave the working tree with a partially applied batch
+	preparedFiles := make([]*patchedFile, 0, len(batch.Files))
+	relativeFilePaths := make([]string, 0, len(batch.Files))
+	for _, file := range batch.Files {
+		preparedFile, err := p.preparePatchedFile(file)
 		if err != nil {
-			log.Error().Err(err).Msg("Error pulling prior to push")
-			return err
+			return "", err
 		}
-		return p.GitConnection.Push()
+		preparedFiles = append(preparedFiles, preparedFile)
+		relativeFilePaths = append(relativeFilePaths, preparedFile.RelativePath)
 	}
 
-	for i := 0; i < 5; i++ {
-		err = executePush()
-		if err == nil {
-			break
+	filesWritten := false
+	defer func() {
+		if err != nil && filesWritten {
+			log.Warn().Msg("Restoring working tree after failed batch patch")
+			if restoreErr := p.GitConnection.Restore(relativeFilePaths); restoreErr != nil {
+				log.Error().Err(restoreErr).Msg("Failed to restore working tree after failed batch patch")
+			}
 		}
-		time.Sleep(time.Duration(i+1) * time.Second)
+	}()
+
+	for _, preparedFile := range preparedFiles {
+		filesWritten = true
+		if err = p.writePatchedFile(preparedFile); err != nil {
+			return "", err
+		}
 	}
 
-	return err
+	log.Debug().Msg("checking for changes")
+	hasChanges, err := p.GitConnection.HasChanges()
+	if err != nil {
+		return "", err
+	}
+
+	if !hasChanges {
+		log.Info().Msg("No changes detected, nothing to commit")
+		return "", nil
+	}
+
+	log.Debug().Msg("Changes detected, committing")
+
+	hash, err = p.GitConnection.Commit(relativeFilePaths, buildCommitMessage(relativeFilePaths, batch.Actor))
+	if err != nil {
+		return "", err
+	}
+
+	// the changes are committed, so the working tree is clean and must not be
+	// restored if the push fails. The commit stays local and is pushed by the
+	// next pull/push cycle
+	filesWritten = false
+	log.Info().Msgf("Created patch commit: %s", hash)
+
+	if err = p.pushWithRetry(); err != nil {
+		log.Error().Err(err).Msgf("Failed to push commit %s, it remains local and is retried on the next patch", hash)
+		return "", err
+	}
+
+	return hash, nil
 }

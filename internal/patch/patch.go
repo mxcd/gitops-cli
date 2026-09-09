@@ -2,6 +2,9 @@ package patch
 
 import (
 	"errors"
+	"fmt"
+	"path/filepath"
+	"strings"
 
 	log "github.com/rs/zerolog/log"
 
@@ -19,6 +22,19 @@ type Patch struct {
 	Value    string `json:"value"`
 }
 
+// FilePatch describes all patches to be applied to a single file.
+type FilePatch struct {
+	FilePath string  `json:"filePath"`
+	Patches  []Patch `json:"patches"`
+}
+
+// PatchBatch describes patches for multiple files that are applied and
+// committed atomically.
+type PatchBatch struct {
+	Actor string      `json:"actor"`
+	Files []FilePatch `json:"files"`
+}
+
 type PrepareOptions struct {
 	Clone bool
 }
@@ -26,6 +42,73 @@ type PrepareOptions struct {
 type PatchMethod interface {
 	Prepare(options *PrepareOptions) error
 	Patch(patchTasks []PatchTask) error
+	// PatchBatch applies all patches of the batch in a single commit and
+	// returns the commit id. An empty commit id is returned if the batch did
+	// not result in any change.
+	PatchBatch(batch PatchBatch) (string, error)
+}
+
+// ErrInvalidPatchBatch wraps all validation errors of a patch batch so callers
+// can distinguish invalid input from execution failures.
+var ErrInvalidPatchBatch = errors.New("invalid patch batch")
+
+// cleanRelativeFilePath validates a file path of a patch request and returns
+// its cleaned, repository relative form.
+func cleanRelativeFilePath(filePath string) (string, error) {
+	if strings.TrimSpace(filePath) == "" {
+		return "", errors.New("must not be empty")
+	}
+
+	if filepath.IsAbs(filePath) || strings.HasPrefix(filePath, "/") || strings.HasPrefix(filePath, "\\") {
+		return "", errors.New("must be relative to the repository root")
+	}
+
+	// paths are passed to `git add` without a `--` separator, so a leading
+	// dash would be interpreted as an option
+	if strings.HasPrefix(filePath, "-") {
+		return "", errors.New("must not start with '-'")
+	}
+
+	cleanedFilePath := filepath.Clean(filePath)
+	if cleanedFilePath == "." || cleanedFilePath == ".." || strings.HasPrefix(cleanedFilePath, ".."+string(filepath.Separator)) {
+		return "", errors.New("must not escape the repository root")
+	}
+
+	return cleanedFilePath, nil
+}
+
+// ValidatePatchBatch checks a patch batch for structural errors. All returned
+// errors wrap ErrInvalidPatchBatch.
+func ValidatePatchBatch(batch PatchBatch) error {
+	if len(batch.Files) == 0 {
+		return fmt.Errorf("%w: files: must not be empty", ErrInvalidPatchBatch)
+	}
+
+	seenFilePaths := map[string]int{}
+
+	for fileIndex, file := range batch.Files {
+		cleanedFilePath, err := cleanRelativeFilePath(file.FilePath)
+		if err != nil {
+			return fmt.Errorf("%w: files[%d].filePath: %s", ErrInvalidPatchBatch, fileIndex, err.Error())
+		}
+
+		if previousIndex, ok := seenFilePaths[cleanedFilePath]; ok {
+			return fmt.Errorf("%w: files[%d].filePath: duplicate of files[%d].filePath ('%s')", ErrInvalidPatchBatch, fileIndex, previousIndex, cleanedFilePath)
+		}
+		seenFilePaths[cleanedFilePath] = fileIndex
+
+		if len(file.Patches) == 0 {
+			return fmt.Errorf("%w: files[%d].patches: must not be empty", ErrInvalidPatchBatch, fileIndex)
+		}
+
+		for patchIndex, filePatch := range file.Patches {
+			if strings.TrimSpace(filePatch.Selector) == "" {
+				return fmt.Errorf("%w: files[%d].patches[%d].selector: must not be empty", ErrInvalidPatchBatch, fileIndex, patchIndex)
+			}
+		}
+	}
+
+	return nil
 }
 
 func PatchCommand(c *cli.Context) error {

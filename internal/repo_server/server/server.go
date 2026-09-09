@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mxcd/gitops-cli/internal/patch"
@@ -20,10 +21,14 @@ type Server struct {
 	Engine     *gin.Engine
 	HttpServer *http.Server
 	Options    *RouterOptions
-	GitPatcher *patch.GitPatcher
+	GitPatcher patch.PatchMethod
+
+	// patchLock serializes all git operations of the patch endpoints against
+	// each other
+	patchLock sync.Mutex
 }
 
-func NewServer(options *RouterOptions, gitPatcher *patch.GitPatcher) (*Server, error) {
+func NewServer(options *RouterOptions, gitPatcher patch.PatchMethod) (*Server, error) {
 	if !options.DevMode {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -55,6 +60,7 @@ func (s *Server) RegisterMiddlewares() {
 func (s *Server) RegisterRoutes() error {
 	s.registerHealthRoute()
 	s.registerPatchRoute()
+	s.registerPatchesRoute()
 
 	return nil
 }

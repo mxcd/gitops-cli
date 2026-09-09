@@ -42,30 +42,29 @@ func (p *RepositoryServerPatcher) Prepare(options *PrepareOptions) error {
 	return nil
 }
 
-func (p *RepositoryServerPatcher) Patch(patchTasks []PatchTask) error {
-	if len(patchTasks) == 0 {
-		log.Warn().Msg("No patch tasks provided, skipping patching")
-		return nil
-	}
+// patchesResponse is the response body of the repository server patch
+// endpoints.
+type patchesResponse struct {
+	Message string `json:"message"`
+	Commit  string `json:"commit"`
+}
 
-	if len(patchTasks) > 1 {
-		log.Warn().Msg("More than one patch task provided, only the first one will be applied")
-	}
-
-	jsonData, err := json.Marshal(patchTasks[0])
+// doPut marshals the payload and sends it to the given repository server path.
+func (p *RepositoryServerPatcher) doPut(path string, payload any) ([]byte, error) {
+	jsonData, err := json.Marshal(payload)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to marshal patch tasks")
-		return fmt.Errorf("failed to marshal patch tasks: %w", err)
+		log.Error().Err(err).Msg("Failed to marshal patch payload")
+		return nil, fmt.Errorf("failed to marshal patch payload: %w", err)
 	}
-	log.Debug().Msgf("Patch task JSON: %s", string(jsonData))
+	log.Debug().Msgf("Patch payload JSON: %s", string(jsonData))
 
-	requestURL := fmt.Sprintf("%s/patch", p.RepositoryServerURL)
+	requestURL := fmt.Sprintf("%s%s", p.RepositoryServerURL, path)
 	log.Debug().Msgf("Request URL: %s", requestURL)
 
 	req, err := http.NewRequest(http.MethodPut, requestURL, bytes.NewReader(jsonData))
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create HTTP request")
-		return fmt.Errorf("failed to create HTTP request: %w", err)
+		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -76,21 +75,61 @@ func (p *RepositoryServerPatcher) Patch(patchTasks []PatchTask) error {
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to send request to repository server")
-		return fmt.Errorf("failed to send request to repository server: %w", err)
+		return nil, fmt.Errorf("failed to send request to repository server: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to read response body")
-		return fmt.Errorf("failed to read response body: %w", err)
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		log.Error().Msgf("Repository server returned status %d: %s", resp.StatusCode, string(body))
-		return fmt.Errorf("repository server returned status %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("repository server returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return body, nil
+}
+
+func (p *RepositoryServerPatcher) Patch(patchTasks []PatchTask) error {
+	if len(patchTasks) == 0 {
+		log.Warn().Msg("No patch tasks provided, skipping patching")
+		return nil
+	}
+
+	if len(patchTasks) > 1 {
+		log.Warn().Msg("More than one patch task provided, only the first one will be applied")
+	}
+
+	if _, err := p.doPut("/patch", patchTasks[0]); err != nil {
+		return err
 	}
 
 	log.Info().Msg("Patch applied successfully via repository server.")
 	return nil
+}
+
+// PatchBatch sends all files of the batch to the repository server so they are
+// applied in a single commit. It returns the commit id reported by the server.
+func (p *RepositoryServerPatcher) PatchBatch(batch PatchBatch) (string, error) {
+	if len(batch.Files) == 0 {
+		log.Warn().Msg("No files provided, skipping patching")
+		return "", nil
+	}
+
+	body, err := p.doPut("/patches", batch)
+	if err != nil {
+		return "", err
+	}
+
+	var response patchesResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		log.Error().Err(err).Msg("Failed to unmarshal response body")
+		return "", fmt.Errorf("failed to unmarshal response body: %w", err)
+	}
+
+	log.Info().Msgf("Batch of %d file(s) applied successfully via repository server. Commit: %s", len(batch.Files), response.Commit)
+	return response.Commit, nil
 }
