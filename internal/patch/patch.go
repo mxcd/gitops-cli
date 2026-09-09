@@ -63,15 +63,16 @@ func cleanRelativeFilePath(filePath string) (string, error) {
 		return "", errors.New("must be relative to the repository root")
 	}
 
-	// paths are passed to `git add` without a `--` separator, so a leading
-	// dash would be interpreted as an option
-	if strings.HasPrefix(filePath, "-") {
-		return "", errors.New("must not start with '-'")
-	}
-
 	cleanedFilePath := filepath.Clean(filePath)
 	if cleanedFilePath == "." || cleanedFilePath == ".." || strings.HasPrefix(cleanedFilePath, ".."+string(filepath.Separator)) {
 		return "", errors.New("must not escape the repository root")
+	}
+
+	// the cleaned path is passed to `git add` without a `--` separator, so a
+	// leading dash would be interpreted as an option. Check the cleaned path,
+	// because e.g. `./-n.yaml` cleans to `-n.yaml`.
+	if strings.HasPrefix(cleanedFilePath, "-") {
+		return "", errors.New("must not start with '-'")
 	}
 
 	return cleanedFilePath, nil

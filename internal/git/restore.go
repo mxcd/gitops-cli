@@ -8,10 +8,11 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// Restore discards working tree changes of the given repository relative file
-// paths by running `git checkout -- <files>`. It intentionally does not touch
-// commits, so a local commit whose push failed is preserved and pushed by a
-// subsequent pull/push cycle.
+// Restore discards working tree and index changes of the given repository
+// relative file paths by running `git checkout HEAD -- <files>`. Restoring from
+// HEAD instead of the index also discards changes that were already staged by a
+// failed commit. It intentionally does not touch commits, so a local commit
+// whose push failed is preserved and pushed by a subsequent pull/push cycle.
 func (c *Connection) Restore(files []string) error {
 	directory := c.Options.Directory
 	if directory == "" {
@@ -23,6 +24,7 @@ func (c *Connection) Restore(files []string) error {
 	}
 
 	msg, err := git.Raw("checkout", runGitIn(directory), func(g *types.Cmd) {
+		g.AddOptions("HEAD")
 		g.AddOptions("--")
 		for _, file := range files {
 			g.AddOptions(file)

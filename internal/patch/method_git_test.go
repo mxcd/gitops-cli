@@ -199,6 +199,41 @@ func TestGitSshPatchBatchNoChanges(t *testing.T) {
 	assert.Empty(t, commitHash)
 }
 
+func TestGitSshPatchBatchPushesPendingLocalCommit(t *testing.T) {
+	patcher := newTestPatcher(t)
+
+	relativeFilePath := seedFixtureFile(t, patcher)
+
+	batch := PatchBatch{
+		Files: []FilePatch{
+			{FilePath: relativeFilePath, Patches: []Patch{{Selector: ".service.image.tag", Value: "v9.0.0"}}},
+		},
+	}
+
+	// simulate a batch whose push failed: the change is committed locally only
+	preparedFile, err := patcher.preparePatchedFile(batch.Files[0])
+	assert.NoError(t, err)
+	assert.NoError(t, patcher.writePatchedFile(preparedFile))
+	localCommitHash, err := patcher.GitConnection.Commit([]string{relativeFilePath}, "local only")
+	assert.NoError(t, err)
+
+	// retrying the same batch finds nothing to change but must push the pending commit
+	commitHash, err := patcher.PatchBatch(batch)
+	assert.NoError(t, err)
+	assert.Equal(t, localCommitHash, commitHash)
+
+	verificationPatcher := newTestPatcher(t)
+	resolvedCommitHash, err := verificationPatcher.GitConnection.RevParse(commitHash)
+	assert.NoError(t, err)
+	assert.Equal(t, commitHash, resolvedCommitHash)
+	assert.Contains(t, readRepositoryFile(t, verificationPatcher.GitConnection, relativeFilePath), "tag: v9.0.0")
+
+	// a further retry has nothing left to push
+	commitHash, err = patcher.PatchBatch(batch)
+	assert.NoError(t, err)
+	assert.Empty(t, commitHash)
+}
+
 func TestGitSshPatchBatchMissingFile(t *testing.T) {
 	patcher := newTestPatcher(t)
 
